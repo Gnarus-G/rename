@@ -59,13 +59,13 @@ impl<'a: 't, 't> Parser<'a> {
         self.peek_token = self.lexer.next();
     }
 
-    fn parse_match_exp(&mut self) -> MatchExpression {
+    fn parse_match_exp(&mut self) -> Result<MatchExpression> {
         let mut expressions = vec![];
 
         while self.token != Token::Eof {
             let exp = match &self.token {
                 Token::Literal(l) => self.parse_literal_exp(l.clone()),
-                Token::Ident(i) => self.parse_capture(i.clone()),
+                Token::Ident(i) => self.parse_capture(i.clone())?,
                 Token::Eof => todo!(),
                 _ => {
                     self.advance();
@@ -78,7 +78,7 @@ impl<'a: 't, 't> Parser<'a> {
             self.advance();
         }
 
-        MatchExpression { expressions }
+        Ok(MatchExpression { expressions })
     }
 
     fn parse_literal_exp(&mut self, first_char: char) -> Expression {
@@ -90,17 +90,17 @@ impl<'a: 't, 't> Parser<'a> {
         Expression::Literal(lit)
     }
 
-    fn parse_capture(&mut self, identifier: String) -> Expression {
+    fn parse_capture(&mut self, identifier: String) -> Result<Expression> {
         self.advance();
-        let _r = self
-            .expect(Token::DigitType)
-            .or(self.expect(Token::IntType));
 
-        Expression::Capture {
+        self.expect(Token::DigitType)
+            .or(self.expect(Token::IntType))?;
+
+        Ok(Expression::Capture {
             identifier: Token::Ident(identifier),
             value: None,
             typing: self.token.clone(),
-        }
+        })
     }
 
     fn expect(&mut self, token: Token) -> Result<()> {
@@ -125,7 +125,7 @@ mod test {
         let mut p = Parser::new(Lexer::new(input));
 
         assert_eq!(
-            p.parse_match_exp(),
+            p.parse_match_exp().unwrap(),
             MatchExpression {
                 expressions: vec![Expression::Literal("abc".to_string())]
             }
@@ -135,7 +135,7 @@ mod test {
         let mut p = Parser::new(Lexer::new(input));
 
         assert_eq!(
-            p.parse_match_exp(),
+            p.parse_match_exp().unwrap(),
             MatchExpression {
                 expressions: vec![Expression::Literal("1234".to_string())]
             }
@@ -148,7 +148,7 @@ mod test {
         let mut p = Parser::new(Lexer::new(input));
 
         assert_eq!(
-            p.parse_match_exp(),
+            p.parse_match_exp().unwrap(),
             MatchExpression {
                 expressions: vec![Expression::Capture {
                     identifier: Token::Ident("num".to_string()),
@@ -165,7 +165,7 @@ mod test {
         let mut p = Parser::new(Lexer::new(input));
 
         assert_eq!(
-            p.parse_match_exp(),
+            p.parse_match_exp().unwrap(),
             MatchExpression {
                 expressions: vec![
                     Expression::Literal("abc".to_string()),
@@ -185,7 +185,7 @@ mod test {
         let mut p = Parser::new(Lexer::new(input));
 
         assert_eq!(
-            p.parse_match_exp(),
+            p.parse_match_exp().unwrap(),
             MatchExpression {
                 expressions: vec![
                     Expression::Literal("abc235".to_string()),
@@ -208,5 +208,18 @@ mod test {
                 ]
             }
         )
+    }
+
+    #[test]
+    fn test_wrong_capture_syntax() {
+        let input = "(ident:)";
+        let mut p = Parser::new(Lexer::new(input));
+        assert_eq!(
+            p.parse_match_exp().unwrap_err(),
+            ParseError::ExpectedToken {
+                expected: Token::IntType,
+                found: Token::Rparen
+            }
+        );
     }
 }
