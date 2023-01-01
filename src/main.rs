@@ -28,7 +28,8 @@ fn main() {
     match args.command {
         Command::REGEX(args) => handle_regex_replacement(args),
         Command::SIMPLE { expression, paths } => {
-            dbg!(expression, paths);
+            let path_strs = paths.iter().map(|p| p.to_str()).flatten().collect();
+            dbg!(expression.apply(path_strs));
         }
     }
 }

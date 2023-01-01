@@ -31,6 +31,44 @@ impl FromStr for MatchAndReplaceExpression {
     }
 }
 
+impl MatchAndReplaceExpression {
+    pub fn apply(&self, strings: Vec<&str>) -> Vec<String> {
+        let match_exp = &self.0;
+        let r: String = match_exp
+            .expressions
+            .iter()
+            .filter_map(|e| match e {
+                Expression::Literal(l) => Some(l.clone()),
+                Expression::Capture {
+                    identifier,
+                    value,
+                    typing,
+                } => {
+                    if let Token::Ident(id) = identifier {
+                        return match typing {
+                            Token::DigitType => Some(format!("(?P<{id}>\\d)")),
+                            Token::IntType => Some(format!("(?P<{id}>\\d+)")),
+                            _ => None,
+                        };
+                    };
+
+                    None
+                }
+            })
+            .collect();
+
+        let pattern = regex::Regex::new(&r).unwrap();
+
+        return strings
+            .iter()
+            .map(|s| {
+                dbg!(pattern.captures(s));
+                return pattern.replace(s, format!("$as")).to_string();
+            })
+            .collect();
+    }
+}
+
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     token: Token,
