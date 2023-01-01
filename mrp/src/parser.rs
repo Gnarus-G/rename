@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, str::FromStr};
 
 use crate::lexer::{Lexer, Token};
 
@@ -21,7 +21,7 @@ impl std::fmt::Display for ParseError {
     }
 }
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     lexer: Lexer<'a>,
     token: Token,
     peek_token: Token,
@@ -40,6 +40,17 @@ enum Expression {
 #[derive(Debug, PartialEq)]
 struct MatchExpression {
     expressions: Vec<Expression>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct MatchAndReplaceExpression(MatchExpression);
+
+impl FromStr for MatchAndReplaceExpression {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Parser::new(Lexer::new(s)).parse()
+    }
 }
 
 impl<'a: 't, 't> Parser<'a> {
@@ -113,6 +124,10 @@ impl<'a: 't, 't> Parser<'a> {
 
         self.advance();
         Ok(())
+    }
+
+    fn parse(&mut self) -> Result<MatchAndReplaceExpression> {
+        Ok(MatchAndReplaceExpression(self.parse_match_exp()?))
     }
 }
 
