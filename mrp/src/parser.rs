@@ -1,4 +1,25 @@
+use std::error::Error;
+
 use crate::lexer::{Lexer, Token};
+
+type Result<'s, T> = std::result::Result<T, ParseError>;
+
+#[derive(Debug, PartialEq)]
+pub enum ParseError {
+    ExpectedToken { expected: Token, found: Token },
+    UnsupportedToken(Token),
+}
+impl Error for ParseError {}
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Self::ExpectedToken { expected, found } => {
+                write!(f, "expected {:?}, but found {:?}", expected, found)
+            }
+            Self::UnsupportedToken(t) => write!(f, "unsupported token: {:?}", t),
+        }
+    }
+}
 
 struct Parser<'a> {
     lexer: Lexer<'a>,
@@ -7,8 +28,26 @@ struct Parser<'a> {
 }
 
 #[derive(Debug, PartialEq)]
+struct CaptureInfo {
+    identifier: Token,
+    value: Option<String>,
+    typing: Token,
+}
+
+impl CaptureInfo {
+    fn new(identifier: &str, typing: Token) -> Self {
+        Self {
+            identifier: Token::Ident(identifier.to_string()),
+            value: None,
+            typing,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 enum Expression {
     Literal(String),
+    Capture(CaptureInfo),
 }
 
 #[derive(Debug, PartialEq)]
@@ -37,15 +76,14 @@ impl<'a: 't, 't> Parser<'a> {
         let mut expressions = vec![];
 
         while self.token != Token::Eof {
-            let exp = match self.token {
-                Token::Literal(l) => self.parse_literal_exp(l),
-                Token::Lparen => todo!(),
-                Token::Rparen => todo!(),
-                Token::DigitType => todo!(),
-                Token::IntType => todo!(),
-                Token::Ident(_) => todo!(),
-                Token::Colon => todo!(),
+            let exp = match &self.token {
+                Token::Literal(l) => self.parse_literal_exp(l.clone()),
+                Token::Ident(i) => self.parse_capture(i.clone()),
                 Token::Eof => todo!(),
+                _ => {
+                    self.advance();
+                    continue;
+                }
             };
 
             expressions.push(exp);
@@ -64,13 +102,34 @@ impl<'a: 't, 't> Parser<'a> {
         }
         Expression::Literal(lit)
     }
+
+    fn parse_capture(&mut self, identifier: String) -> Expression {
+        self.advance();
+        let _r = self
+            .expect(Token::DigitType)
+            .or(self.expect(Token::IntType));
+
+        Expression::Capture(CaptureInfo::new(&identifier, self.token.clone()))
+    }
+
+    fn expect(&mut self, token: Token) -> Result<()> {
+        if self.peek_token != token {
+            return Err(ParseError::ExpectedToken {
+                expected: token,
+                found: self.peek_token.clone(),
+            });
+        }
+
+        self.advance();
+        Ok(())
+    }
 }
 
 mod test {
     use super::*;
 
     #[test]
-    fn test_simple_match_expression() {
+    fn test_literal_expression() {
         let input = "abc";
         let mut p = Parser::new(Lexer::new(input));
 
@@ -88,6 +147,74 @@ mod test {
             p.parse_match_exp(),
             MatchExpression {
                 expressions: vec![Expression::Literal("1234".to_string())]
+            }
+        )
+    }
+
+    #[test]
+    fn test_capture_expression() {
+        let input = "(num:int)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp(),
+            MatchExpression {
+                expressions: vec![Expression::Capture(CaptureInfo {
+                    identifier: Token::Ident("num".to_string()),
+                    value: None,
+                    typing: Token::IntType
+                })]
+            }
+        );
+    }
+
+    #[test]
+    fn test_simple_match_expression() {
+        let input = "abc(d:dig)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp(),
+            MatchExpression {
+                expressions: vec![
+                    Expression::Literal("abc".to_string()),
+                    Expression::Capture(CaptureInfo {
+                        identifier: Token::Ident("d".to_string()),
+                        value: None,
+                        typing: Token::DigitType
+                    })
+                ]
+            }
+        )
+    }
+
+    #[test]
+    fn test_multiple_captures_in_match_expression() {
+        let input = "abc235(d:dig)zap(num:int)(d:int)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp(),
+            MatchExpression {
+                expressions: vec![
+                    Expression::Literal("abc235".to_string()),
+                    Expression::Capture(CaptureInfo {
+                        identifier: Token::Ident("d".to_string()),
+                        value: None,
+                        typing: Token::DigitType
+                    }),
+                    Expression::Literal("zap".to_string()),
+                    Expression::Capture(CaptureInfo {
+                        identifier: Token::Ident("num".to_string()),
+                        value: None,
+                        typing: Token::IntType
+                    }),
+                    Expression::Capture(CaptureInfo {
+                        identifier: Token::Ident("d".to_string()),
+                        value: None,
+                        typing: Token::IntType
+                    }),
+                ]
             }
         )
     }
