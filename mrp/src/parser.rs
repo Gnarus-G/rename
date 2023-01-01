@@ -28,26 +28,13 @@ struct Parser<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-struct CaptureInfo {
-    identifier: Token,
-    value: Option<String>,
-    typing: Token,
-}
-
-impl CaptureInfo {
-    fn new(identifier: &str, typing: Token) -> Self {
-        Self {
-            identifier: Token::Ident(identifier.to_string()),
-            value: None,
-            typing,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq)]
 enum Expression {
     Literal(String),
-    Capture(CaptureInfo),
+    Capture {
+        identifier: Token,
+        value: Option<String>,
+        typing: Token,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -109,7 +96,11 @@ impl<'a: 't, 't> Parser<'a> {
             .expect(Token::DigitType)
             .or(self.expect(Token::IntType));
 
-        Expression::Capture(CaptureInfo::new(&identifier, self.token.clone()))
+        Expression::Capture {
+            identifier: Token::Ident(identifier),
+            value: None,
+            typing: self.token.clone(),
+        }
     }
 
     fn expect(&mut self, token: Token) -> Result<()> {
@@ -159,11 +150,11 @@ mod test {
         assert_eq!(
             p.parse_match_exp(),
             MatchExpression {
-                expressions: vec![Expression::Capture(CaptureInfo {
+                expressions: vec![Expression::Capture {
                     identifier: Token::Ident("num".to_string()),
                     value: None,
                     typing: Token::IntType
-                })]
+                }]
             }
         );
     }
@@ -178,11 +169,11 @@ mod test {
             MatchExpression {
                 expressions: vec![
                     Expression::Literal("abc".to_string()),
-                    Expression::Capture(CaptureInfo {
+                    Expression::Capture {
                         identifier: Token::Ident("d".to_string()),
                         value: None,
                         typing: Token::DigitType
-                    })
+                    }
                 ]
             }
         )
@@ -198,22 +189,22 @@ mod test {
             MatchExpression {
                 expressions: vec![
                     Expression::Literal("abc235".to_string()),
-                    Expression::Capture(CaptureInfo {
+                    Expression::Capture {
                         identifier: Token::Ident("d".to_string()),
                         value: None,
                         typing: Token::DigitType
-                    }),
+                    },
                     Expression::Literal("zap".to_string()),
-                    Expression::Capture(CaptureInfo {
+                    Expression::Capture {
                         identifier: Token::Ident("num".to_string()),
                         value: None,
                         typing: Token::IntType
-                    }),
-                    Expression::Capture(CaptureInfo {
+                    },
+                    Expression::Capture {
                         identifier: Token::Ident("d".to_string()),
                         value: None,
                         typing: Token::IntType
-                    }),
+                    },
                 ]
             }
         )
