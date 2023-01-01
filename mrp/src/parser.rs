@@ -70,12 +70,16 @@ impl<'l> Parser<'l> {
         self.peek_token = self.lexer.next();
     }
 
+    fn parse(&mut self) -> Result<MatchAndReplaceExpression> {
+        Ok(MatchAndReplaceExpression(self.parse_match_exp()?))
+    }
+
     fn parse_match_exp(&mut self) -> Result<MatchExpression> {
         let mut expressions = vec![];
 
         while self.token != Token::Eof {
             let exp = match &self.token {
-                Token::Literal(l) => self.parse_literal_exp(l.clone()),
+                Token::Literal(l) => self.parse_literal(l.clone()),
                 Token::Ident(i) => self.parse_capture(i.clone())?,
                 Token::Eof => todo!(),
                 _ => {
@@ -92,7 +96,7 @@ impl<'l> Parser<'l> {
         Ok(MatchExpression { expressions })
     }
 
-    fn parse_literal_exp(&mut self, first_char: char) -> Expression {
+    fn parse_literal(&mut self, first_char: char) -> Expression {
         let mut lit = String::from(first_char);
         while let Token::Literal(ch) = self.peek_token {
             self.advance();
@@ -124,10 +128,6 @@ impl<'l> Parser<'l> {
 
         self.advance();
         Ok(())
-    }
-
-    fn parse(&mut self) -> Result<MatchAndReplaceExpression> {
-        Ok(MatchAndReplaceExpression(self.parse_match_exp()?))
     }
 }
 
