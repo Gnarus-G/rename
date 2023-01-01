@@ -4,13 +4,13 @@ use std::{
 };
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token<'s> {
+pub enum Token {
     Literal(char),
     Lparen,
     Rparen,
     DigitType,
     IntType,
-    Ident(&'s str),
+    Ident(String),
     Colon,
     Eof,
 }
@@ -24,7 +24,7 @@ enum LexingMode {
 const NO_CHAR: char = 0 as char;
 
 #[derive(Debug)]
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     input: &'a str,
     ch: char,
     position: usize,
@@ -33,7 +33,7 @@ struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a str) -> Self {
         let mut l = Self {
             input,
             ch: NO_CHAR,
@@ -73,7 +73,7 @@ impl<'a> Lexer<'a> {
         return &self.input[start_pos..self.position];
     }
 
-    fn next(&mut self) -> Token {
+    pub fn next(&mut self) -> Token {
         let t = match self.ch {
             '(' => Token::Lparen,
             ':' => Token::Colon,
@@ -84,7 +84,7 @@ impl<'a> Lexer<'a> {
                 return match str {
                     "dig" => Token::DigitType,
                     "int" => Token::IntType,
-                    str => Token::Ident(str),
+                    str => Token::Ident(str.to_string()),
                 };
             }
             c => Token::Literal(c),
@@ -121,81 +121,85 @@ fn to_digit(c: &char) -> Option<u8> {
         _ => None,
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn one_char_sequence() {
-    let mut l = Lexer::new("abcna");
+    #[test]
+    fn one_char_sequence() {
+        let mut l = Lexer::new("abcna");
 
-    assert_eq!(l.next(), Token::Literal('a'));
-    assert_eq!(l.next(), Token::Literal('b'));
-    assert_eq!(l.next(), Token::Literal('c'));
-    assert_eq!(l.next(), Token::Literal('n'));
-    assert_eq!(l.next(), Token::Literal('a'));
-}
+        assert_eq!(l.next(), Token::Literal('a'));
+        assert_eq!(l.next(), Token::Literal('b'));
+        assert_eq!(l.next(), Token::Literal('c'));
+        assert_eq!(l.next(), Token::Literal('n'));
+        assert_eq!(l.next(), Token::Literal('a'));
+    }
 
-#[test]
-fn one_literal_and_one_digit_capture() {
-    let mut l = Lexer::new("a5(d:dig)");
-    assert_eq!(l.next(), Token::Literal('a'));
-    assert_eq!(l.next(), Token::Literal('5'));
-    assert_eq!(l.next(), Token::Lparen);
-    assert_eq!(l.next(), Token::Ident("d"));
-    assert_eq!(l.next(), Token::Colon);
-    assert_eq!(l.next(), Token::DigitType);
-    assert_eq!(l.next(), Token::Rparen);
-}
+    #[test]
+    fn one_literal_and_one_digit_capture() {
+        let mut l = Lexer::new("a5(d:dig)");
+        assert_eq!(l.next(), Token::Literal('a'));
+        assert_eq!(l.next(), Token::Literal('5'));
+        assert_eq!(l.next(), Token::Lparen);
+        assert_eq!(l.next(), Token::Ident("d".to_string()));
+        assert_eq!(l.next(), Token::Colon);
+        assert_eq!(l.next(), Token::DigitType);
+        assert_eq!(l.next(), Token::Rparen);
+    }
 
-#[test]
-fn one_literal_letter_and_one_integer_capture() {
-    let mut l = Lexer::new("z(i:int)");
-    assert_eq!(l.next(), Token::Literal('z'));
-    assert_eq!(l.next(), Token::Lparen);
-    assert_eq!(l.next(), Token::Ident("i"));
-    assert_eq!(l.next(), Token::Colon);
-    assert_eq!(l.next(), Token::IntType);
-    assert_eq!(l.next(), Token::Rparen);
-}
+    #[test]
+    fn one_literal_letter_and_one_integer_capture() {
+        let mut l = Lexer::new("z(i:int)");
+        assert_eq!(l.next(), Token::Literal('z'));
+        assert_eq!(l.next(), Token::Lparen);
+        assert_eq!(l.next(), Token::Ident("i".to_string()));
+        assert_eq!(l.next(), Token::Colon);
+        assert_eq!(l.next(), Token::IntType);
+        assert_eq!(l.next(), Token::Rparen);
+    }
 
-#[test]
-fn two_intersperced_captures() {
-    let mut l = Lexer::new("iawe10(x:dig)zap(i:int)");
+    #[test]
+    fn two_intersperced_captures() {
+        let mut l = Lexer::new("iawe10(x:dig)zap(i:int)");
 
-    assert_eq!(l.next(), Token::Literal('i'));
-    assert_eq!(l.next(), Token::Literal('a'));
-    assert_eq!(l.next(), Token::Literal('w'));
-    assert_eq!(l.next(), Token::Literal('e'));
-    assert_eq!(l.next(), Token::Literal('1'));
-    assert_eq!(l.next(), Token::Literal('0'));
-    assert_eq!(l.next(), Token::Lparen);
-    assert_eq!(l.next(), Token::Ident("x"));
-    assert_eq!(l.next(), Token::Colon);
-    assert_eq!(l.next(), Token::DigitType);
-    assert_eq!(l.next(), Token::Rparen);
+        assert_eq!(l.next(), Token::Literal('i'));
+        assert_eq!(l.next(), Token::Literal('a'));
+        assert_eq!(l.next(), Token::Literal('w'));
+        assert_eq!(l.next(), Token::Literal('e'));
+        assert_eq!(l.next(), Token::Literal('1'));
+        assert_eq!(l.next(), Token::Literal('0'));
+        assert_eq!(l.next(), Token::Lparen);
+        assert_eq!(l.next(), Token::Ident("x".to_string()));
+        assert_eq!(l.next(), Token::Colon);
+        assert_eq!(l.next(), Token::DigitType);
+        assert_eq!(l.next(), Token::Rparen);
 
-    assert_eq!(l.next(), Token::Literal('z'));
-    assert_eq!(l.next(), Token::Literal('a'));
-    assert_eq!(l.next(), Token::Literal('p'));
-    assert_eq!(l.next(), Token::Lparen);
-    assert_eq!(l.next(), Token::Ident("i"));
-    assert_eq!(l.next(), Token::Colon);
-    assert_eq!(l.next(), Token::IntType);
-    assert_eq!(l.next(), Token::Rparen);
-}
+        assert_eq!(l.next(), Token::Literal('z'));
+        assert_eq!(l.next(), Token::Literal('a'));
+        assert_eq!(l.next(), Token::Literal('p'));
+        assert_eq!(l.next(), Token::Lparen);
+        assert_eq!(l.next(), Token::Ident("i".to_string()));
+        assert_eq!(l.next(), Token::Colon);
+        assert_eq!(l.next(), Token::IntType);
+        assert_eq!(l.next(), Token::Rparen);
+    }
 
-#[test]
-fn two_consecutive_captures() {
-    let mut l = Lexer::new("a5(d:dig)(num:int)");
-    assert_eq!(l.next(), Token::Literal('a'));
-    assert_eq!(l.next(), Token::Literal('5'));
-    assert_eq!(l.next(), Token::Lparen);
-    assert_eq!(l.next(), Token::Ident("d"));
-    assert_eq!(l.next(), Token::Colon);
-    assert_eq!(l.next(), Token::DigitType);
-    assert_eq!(l.next(), Token::Rparen);
+    #[test]
+    fn two_consecutive_captures() {
+        let mut l = Lexer::new("a5(d:dig)(num:int)");
+        assert_eq!(l.next(), Token::Literal('a'));
+        assert_eq!(l.next(), Token::Literal('5'));
+        assert_eq!(l.next(), Token::Lparen);
+        assert_eq!(l.next(), Token::Ident("d".to_string()));
+        assert_eq!(l.next(), Token::Colon);
+        assert_eq!(l.next(), Token::DigitType);
+        assert_eq!(l.next(), Token::Rparen);
 
-    assert_eq!(l.next(), Token::Lparen);
-    assert_eq!(l.next(), Token::Ident("num"));
-    assert_eq!(l.next(), Token::Colon);
-    assert_eq!(l.next(), Token::IntType);
-    assert_eq!(l.next(), Token::Rparen);
+        assert_eq!(l.next(), Token::Lparen);
+        assert_eq!(l.next(), Token::Ident("num".to_string()));
+        assert_eq!(l.next(), Token::Colon);
+        assert_eq!(l.next(), Token::IntType);
+        assert_eq!(l.next(), Token::Rparen);
+    }
 }
