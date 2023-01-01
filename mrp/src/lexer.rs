@@ -1,8 +1,3 @@
-use std::{
-    iter::{Enumerate, Peekable},
-    str::Chars,
-};
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Literal(char),
@@ -121,6 +116,7 @@ fn to_digit(c: &char) -> Option<u8> {
         _ => None,
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
