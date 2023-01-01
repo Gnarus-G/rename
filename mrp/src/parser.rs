@@ -1,31 +1,9 @@
-use std::{error::Error, str::FromStr};
+use std::str::FromStr;
 
-use crate::lexer::{Lexer, Token};
-
-type Result<'s, T> = std::result::Result<T, ParseError>;
-
-#[derive(Debug, PartialEq)]
-pub enum ParseError {
-    ExpectedToken { expected: Token, found: Token },
-    UnsupportedToken(Token),
-}
-impl Error for ParseError {}
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Self::ExpectedToken { expected, found } => {
-                write!(f, "expected {:?}, but found {:?}", expected, found)
-            }
-            Self::UnsupportedToken(t) => write!(f, "unsupported token: {:?}", t),
-        }
-    }
-}
-
-pub struct Parser<'a> {
-    lexer: Lexer<'a>,
-    token: Token,
-    peek_token: Token,
-}
+use crate::{
+    error::{ParseError, Result},
+    lexer::{Lexer, Token},
+};
 
 #[derive(Debug, PartialEq)]
 enum Expression {
@@ -51,6 +29,12 @@ impl FromStr for MatchAndReplaceExpression {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Parser::new(Lexer::new(s)).parse()
     }
+}
+
+pub struct Parser<'a> {
+    lexer: Lexer<'a>,
+    token: Token,
+    peek_token: Token,
 }
 
 impl<'l> Parser<'l> {
