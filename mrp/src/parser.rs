@@ -53,8 +53,8 @@ impl FromStr for MatchAndReplaceExpression {
     }
 }
 
-impl<'a: 't, 't> Parser<'a> {
-    pub fn new(lexer: Lexer<'a>) -> Self {
+impl<'l> Parser<'l> {
+    fn new(lexer: Lexer<'l>) -> Self {
         let mut p = Self {
             lexer,
             token: Token::Eof,
@@ -65,7 +65,7 @@ impl<'a: 't, 't> Parser<'a> {
         p
     }
 
-    fn advance<'s: 't>(&'s mut self) {
+    fn advance(&mut self) {
         self.token = self.peek_token.clone();
         self.peek_token = self.lexer.next();
     }
