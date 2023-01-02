@@ -7,6 +7,14 @@ use mrp::parser::MatchAndReplaceExpression;
 struct RenameArgs {
     #[clap(subcommand)]
     command: Command,
+
+    /// One or more paths to rename.
+    #[clap(global = true)]
+    paths: Vec<std::path::PathBuf>,
+
+    /// Don't actually rename the files, instead just print each rename that would happen.
+    #[clap(long, global = true)]
+    dry_run: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -21,8 +29,8 @@ fn main() {
     let base_args = RenameArgs::parse();
 
     match &base_args.command {
-        Command::REGEX(args) => handle_regex_replacement(args),
-        Command::SIMPLE(args) => handle_mrp_replacement(args),
+        Command::REGEX(args) => handle_regex_replacement(args, &base_args),
+        Command::SIMPLE(args) => handle_mrp_replacement(args, &base_args),
     }
 }
 
@@ -30,17 +38,10 @@ fn main() {
 struct SimpleArgs {
     /// A Match & Replace expression in the custom MRP syntax.
     expression: MatchAndReplaceExpression,
-
-    /// One or more paths to rename.
-    paths: Vec<std::path::PathBuf>,
-
-    /// Don't actually rename the files, instead just print each rename that would happen.
-    #[clap(long)]
-    dry_run: bool,
 }
 
-fn handle_mrp_replacement(args: &SimpleArgs) {
-    let path_strs = args
+fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
+    let path_strs = base_args
         .paths
         .iter()
         .filter_map(|p| {
@@ -54,15 +55,19 @@ fn handle_mrp_replacement(args: &SimpleArgs) {
 
     let replacements = args.expression.apply(path_strs);
 
-    args.paths.iter().zip(replacements).for_each(|(from, to)| {
-        if args.dry_run {
-            println!("Rename {:?} to {:?}", from, to);
-        } else {
-            if let Err(err) = std::fs::rename(from, to) {
-                eprintln!("{:?}: {}", from, err);
+    base_args
+        .paths
+        .iter()
+        .zip(replacements)
+        .for_each(|(from, to)| {
+            if base_args.dry_run {
+                println!("Rename {:?} to {:?}", from, to);
+            } else {
+                if let Err(err) = std::fs::rename(from, to) {
+                    eprintln!("{:?}: {}", from, err);
+                }
             }
-        }
-    });
+        });
 }
 
 #[derive(Debug, Args)]
@@ -71,16 +76,9 @@ struct RegexArgs {
     pattern: regex::Regex,
     /// The replacement format based on the regex capture groups.
     replacement: String,
-
-    /// One or more paths to rename.
-    paths: Vec<std::path::PathBuf>,
-
-    /// Don't actually rename the files, instead just print each rename that would happen.
-    #[clap(long)]
-    dry_run: bool,
 }
 
-fn handle_regex_replacement(args: &RegexArgs) {
+fn handle_regex_replacement(args: &RegexArgs, base_args: &RenameArgs) {
     let transform = |name| {
         return (
             name,
@@ -88,12 +86,13 @@ fn handle_regex_replacement(args: &RegexArgs) {
         );
     };
 
-    args.paths
+    base_args
+        .paths
         .iter()
         .for_each(|path| match path.to_str().map(transform) {
             None => eprintln!("Path is invalid unicode: {:?}", path),
             Some((from, to)) => {
-                if args.dry_run {
+                if base_args.dry_run {
                     println!("Rename {:?} to {:?}", path, to);
                 } else {
                     if let Err(err) = std::fs::rename(from, to) {
