@@ -2,7 +2,7 @@ use clap::{Args, Parser, Subcommand};
 use mrp::parser::MatchAndReplaceExpression;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about)]
+#[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
 /// A utility for renaming paths (files and directories) in bulk.
 struct RenameArgs {
     #[clap(subcommand)]
