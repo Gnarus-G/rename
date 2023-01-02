@@ -11,7 +11,7 @@ jobs:
   build:
     strategy:
       matrix:
-        crate: [caress]
+        crate: [rn]
         os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
