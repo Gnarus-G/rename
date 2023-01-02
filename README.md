@@ -32,3 +32,6 @@ or
 ```
 ## Demo
 ![simplescreenrecorder-2023-01-01_23 51 24](https://user-images.githubusercontent.com/37311893/210196100-96190c6e-9597-4755-a0a0-de86ca407d4a.gif)
+
+## Note
+The "simple" match and replace syntax is still in development. The happy path pretty works, but I haven't put any real effort to handle bad syntax with good error messages.
