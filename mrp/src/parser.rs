@@ -34,9 +34,9 @@ impl FromStr for MatchAndReplaceExpression {
 }
 
 impl MatchAndReplaceExpression {
-    pub fn apply(&self, strings: Vec<&str>) -> Vec<String> {
+    pub fn apply(&self, strings: Vec<&str>, strip: bool) -> Vec<String> {
         let MatchAndReplaceExpression(match_exp, replace_exp) = &self;
-        let regex_pattern: String = match_exp
+        let mut regex_pattern: String = match_exp
             .expressions
             .iter()
             .filter_map(|e| match e {
@@ -55,6 +55,11 @@ impl MatchAndReplaceExpression {
                 Expression::Identifier(_) => None,
             })
             .collect();
+
+        if strip {
+            regex_pattern.insert_str(0, ".*");
+            regex_pattern.push_str(".*");
+        }
 
         let regex_replacement: String = replace_exp
             .expressions
@@ -331,14 +336,23 @@ mod test {
         let input = "(num:int)asdf->lul(num)";
         let expression = MatchAndReplaceExpression::from_str(input).unwrap();
 
-        let treated = expression.apply(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
+        let treated = expression.apply(vec!["124asdf", "3asdfwery", "lk234asdfas"], false);
 
         assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
 
         let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
 
-        let treated = expression.apply(vec!["hello5", "ashello090", "hello345hello"]);
+        let treated = expression.apply(vec!["hello5", "ashello090", "hello345hello"], false);
 
         assert_eq!(treated, vec!["oh5hi", "asoh0hi90", "oh3hi45hello"]);
+    }
+
+    #[test]
+    fn test_mrp_application_stripping() {
+        let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+
+        let treated = expression.apply(vec!["hello5", "ashello090", "hello345hello"], true);
+
+        assert_eq!(treated, vec!["oh5hi", "oh0hi", "oh3hi"]);
     }
 }

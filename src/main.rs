@@ -38,6 +38,9 @@ fn main() {
 struct SimpleArgs {
     /// A Match & Replace expression in the custom MRP syntax.
     expression: MatchAndReplaceExpression,
+    /// Strip off anything not explicitly matched for while replacting.
+    #[clap(short, long)]
+    strip: bool,
 }
 
 fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
@@ -53,7 +56,7 @@ fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
         })
         .collect();
 
-    let replacements = args.expression.apply(path_strs);
+    let replacements = args.expression.apply(path_strs, args.strip);
 
     base_args
         .paths
