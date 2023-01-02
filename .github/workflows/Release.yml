@@ -3,17 +3,18 @@ name: Release
 on:
   release:
     types: [created]
-    
+
 env:
   CARGO_TERM_COLOR: always
-  
+
 jobs:
   build:
     strategy:
       matrix:
-        crate: [rename]
+        crate: [caress]
+        os: [ubuntu-latest, macos-latest]
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -27,44 +28,13 @@ jobs:
           override: true
 
       - name: Build
-        run: cargo build --all --release && strip target/release/${{ matrix.crate }} && mv target/release/${{ matrix.crate }} target/release/${{ matrix.crate }}_amd64
+        run: ./build.sh ${{ matrix.crate }}
 
       - name: Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            target/release/${{ matrix.crate }}_amd64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-mac:
-    strategy:
-      matrix:
-        crate: [rename]
-
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          target: x86_64-apple-darwin
-          default: true
-          override: true
-
-      - name: Build for mac
-        run: cargo build --all --release && strip target/release/${{ matrix.crate }} && mv target/release/${{ matrix.crate }} target/release/${{ matrix.crate }}_darwin
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            target/release/${{ matrix.crate }}_darwin
+            ${{ matrix.crate }}-*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
