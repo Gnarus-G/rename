@@ -20,4 +20,4 @@ Grab a binary (linux or mac) in [releases](https://github.com/Gnarus-G/rename/re
 ./rn simple --help
 ```
 ## Demo
-![simplescreenrecorder-2023-01-01_23 20 54](https://user-images.githubusercontent.com/37311893/210195027-51679038-f965-4195-8f9a-a26cc9354129.gif)
+![simplescreenrecorder-2023-01-01_23 51 24](https://user-images.githubusercontent.com/37311893/210196100-96190c6e-9597-4755-a0a0-de86ca407d4a.gif)
