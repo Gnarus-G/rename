@@ -17,6 +17,9 @@ enum Command {
         expression: MatchAndReplaceExpression,
         /// One or more files to rename.
         paths: Vec<std::path::PathBuf>,
+        #[clap(long)]
+        /// Don't actually rename the files, instead just print each rename that would happen.
+        dry_run: bool,
     },
     /// Use and apply a regex replace on each filename
     REGEX(RegexArgs),
@@ -27,9 +30,33 @@ fn main() {
 
     match args.command {
         Command::REGEX(args) => handle_regex_replacement(args),
-        Command::SIMPLE { expression, paths } => {
-            let path_strs = paths.iter().map(|p| p.to_str()).flatten().collect();
-            dbg!(expression.apply(path_strs));
+        Command::SIMPLE {
+            expression,
+            paths,
+            dry_run,
+        } => {
+            let path_strs = paths
+                .iter()
+                .filter_map(|p| {
+                    let str = p.to_str();
+                    if str.is_none() {
+                        eprintln!("Path is invalid unicode: {:?}", p);
+                    }
+                    return str;
+                })
+                .collect();
+
+            let replacements = expression.apply(path_strs);
+
+            paths.iter().zip(replacements).for_each(|(from, to)| {
+                if dry_run {
+                    println!("Rename {:?} to {:?}", from, to);
+                } else {
+                    if let Err(err) = std::fs::rename(from, to) {
+                        eprintln!("{:?}: {}", from, err);
+                    }
+                }
+            });
         }
     }
 }

@@ -8,11 +8,8 @@ use crate::{
 #[derive(Debug, PartialEq)]
 enum Expression {
     Literal(String),
-    Capture {
-        identifier: Token,
-        value: Option<String>,
-        typing: Token,
-    },
+    Identifier(String),
+    Capture { identifier: Token, typing: Token },
 }
 
 #[derive(Debug, PartialEq)]
@@ -21,7 +18,12 @@ struct MatchExpression {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MatchAndReplaceExpression(MatchExpression);
+struct ReplaceExpression {
+    expressions: Vec<Expression>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct MatchAndReplaceExpression(MatchExpression, ReplaceExpression);
 
 impl FromStr for MatchAndReplaceExpression {
     type Err = ParseError;
@@ -33,17 +35,13 @@ impl FromStr for MatchAndReplaceExpression {
 
 impl MatchAndReplaceExpression {
     pub fn apply(&self, strings: Vec<&str>) -> Vec<String> {
-        let match_exp = &self.0;
-        let r: String = match_exp
+        let MatchAndReplaceExpression(match_exp, replace_exp) = &self;
+        let regex_pattern: String = match_exp
             .expressions
             .iter()
             .filter_map(|e| match e {
                 Expression::Literal(l) => Some(l.clone()),
-                Expression::Capture {
-                    identifier,
-                    value,
-                    typing,
-                } => {
+                Expression::Capture { identifier, typing } => {
                     if let Token::Ident(id) = identifier {
                         return match typing {
                             Token::DigitType => Some(format!("(?P<{id}>\\d)")),
@@ -54,17 +52,28 @@ impl MatchAndReplaceExpression {
 
                     None
                 }
+                Expression::Identifier(_) => None,
             })
             .collect();
 
-        let pattern = regex::Regex::new(&r).unwrap();
+        let regex_replacement: String = replace_exp
+            .expressions
+            .iter()
+            .filter_map(|e| match e {
+                Expression::Literal(l) => Some(l.clone()),
+                Expression::Capture {
+                    identifier: _,
+                    typing: _,
+                } => None,
+                Expression::Identifier(id) => Some(format!("${{{id}}}")),
+            })
+            .collect();
+
+        let pattern = regex::Regex::new(&regex_pattern).unwrap();
 
         return strings
             .iter()
-            .map(|s| {
-                dbg!(pattern.captures(s));
-                return pattern.replace(s, format!("$as")).to_string();
-            })
+            .map(|s| pattern.replace(s, &regex_replacement).to_string())
             .collect();
     }
 }
@@ -93,7 +102,10 @@ impl<'l> Parser<'l> {
     }
 
     fn parse(&mut self) -> Result<MatchAndReplaceExpression> {
-        Ok(MatchAndReplaceExpression(self.parse_match_exp()?))
+        Ok(MatchAndReplaceExpression(
+            self.parse_match_exp()?,
+            self.parse_replacement_exp()?,
+        ))
     }
 
     fn parse_match_exp(&mut self) -> Result<MatchExpression> {
@@ -103,7 +115,10 @@ impl<'l> Parser<'l> {
             let exp = match &self.token {
                 Token::Literal(l) => self.parse_literal(l.clone()),
                 Token::Ident(i) => self.parse_capture(i.clone())?,
-                Token::Eof => todo!(),
+                Token::Arrow => {
+                    self.advance();
+                    break;
+                }
                 _ => {
                     self.advance();
                     continue;
@@ -135,7 +150,7 @@ impl<'l> Parser<'l> {
 
         Ok(Expression::Capture {
             identifier: Token::Ident(identifier),
-            value: None,
+
             typing: self.token.clone(),
         })
     }
@@ -150,6 +165,27 @@ impl<'l> Parser<'l> {
 
         self.advance();
         Ok(())
+    }
+
+    fn parse_replacement_exp(&mut self) -> Result<ReplaceExpression> {
+        let mut expressions = vec![];
+
+        while self.token != Token::Eof {
+            let exp = match &self.token {
+                Token::Literal(l) => self.parse_literal(l.clone()),
+                Token::Ident(i) => Expression::Identifier(i.clone()),
+                _ => {
+                    self.advance();
+                    continue;
+                }
+            };
+
+            expressions.push(exp);
+
+            self.advance();
+        }
+
+        Ok(ReplaceExpression { expressions })
     }
 }
 
@@ -189,7 +225,7 @@ mod test {
             MatchExpression {
                 expressions: vec![Expression::Capture {
                     identifier: Token::Ident("num".to_string()),
-                    value: None,
+
                     typing: Token::IntType
                 }]
             }
@@ -208,7 +244,7 @@ mod test {
                     Expression::Literal("abc".to_string()),
                     Expression::Capture {
                         identifier: Token::Ident("d".to_string()),
-                        value: None,
+
                         typing: Token::DigitType
                     }
                 ]
@@ -228,18 +264,18 @@ mod test {
                     Expression::Literal("abc235".to_string()),
                     Expression::Capture {
                         identifier: Token::Ident("d".to_string()),
-                        value: None,
+
                         typing: Token::DigitType
                     },
                     Expression::Literal("zap".to_string()),
                     Expression::Capture {
                         identifier: Token::Ident("num".to_string()),
-                        value: None,
+
                         typing: Token::IntType
                     },
                     Expression::Capture {
                         identifier: Token::Ident("d".to_string()),
-                        value: None,
+
                         typing: Token::IntType
                     },
                 ]
@@ -258,5 +294,51 @@ mod test {
                 found: Token::Rparen
             }
         );
+    }
+
+    #[test]
+    fn test_simple_match_and_replace_expression() {
+        let input = "(num:int)asdf->lul(num)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp().unwrap(),
+            MatchExpression {
+                expressions: vec![
+                    Expression::Capture {
+                        identifier: Token::Ident("num".to_string()),
+
+                        typing: Token::IntType
+                    },
+                    Expression::Literal("asdf".to_string()),
+                ]
+            }
+        );
+
+        assert_eq!(
+            p.parse_replacement_exp().unwrap(),
+            ReplaceExpression {
+                expressions: vec![
+                    Expression::Literal("lul".to_string()),
+                    Expression::Identifier("num".to_string())
+                ]
+            }
+        )
+    }
+
+    #[test]
+    fn test_mrp_application() {
+        let input = "(num:int)asdf->lul(num)";
+        let expression = MatchAndReplaceExpression::from_str(input).unwrap();
+
+        let treated = expression.apply(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
+
+        assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
+
+        let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+
+        let treated = expression.apply(vec!["hello5", "ashello090", "hello345hello"]);
+
+        assert_eq!(treated, vec!["oh5hi", "asoh0hi90", "oh3hi45hello"]);
     }
 }

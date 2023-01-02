@@ -7,6 +7,7 @@ pub enum Token {
     IntType,
     Ident(String),
     Colon,
+    Arrow,
     Eof,
 }
 
@@ -73,6 +74,10 @@ impl<'a> Lexer<'a> {
             '(' => Token::Lparen,
             ':' => Token::Colon,
             ')' => Token::Rparen,
+            '-' if self.peek_char() == '>' => {
+                self.read_char();
+                Token::Arrow
+            }
             c if c == NO_CHAR => Token::Eof,
             c if c.is_ascii_alphabetic() && self.mode == LexingMode::String => {
                 let str = self.read_while(|c| c.is_ascii_alphabetic());
@@ -98,22 +103,6 @@ impl<'a> Lexer<'a> {
         } else if self.ch == ')' {
             self.mode = LexingMode::Char;
         }
-    }
-}
-
-fn to_digit(c: &char) -> Option<u8> {
-    match c {
-        '0' => Some(0),
-        '1' => Some(1),
-        '2' => Some(2),
-        '3' => Some(3),
-        '4' => Some(4),
-        '5' => Some(5),
-        '6' => Some(6),
-        '7' => Some(7),
-        '8' => Some(8),
-        '9' => Some(9),
-        _ => None,
     }
 }
 
@@ -197,5 +186,21 @@ mod tests {
         assert_eq!(l.next(), Token::Colon);
         assert_eq!(l.next(), Token::IntType);
         assert_eq!(l.next(), Token::Rparen);
+    }
+
+    #[test]
+    fn simple_match_and_replacement() {
+        let mut l = Lexer::new("a(n:dig)->(n)b");
+        assert_eq!(l.next(), Token::Literal('a'));
+        assert_eq!(l.next(), Token::Lparen);
+        assert_eq!(l.next(), Token::Ident("n".to_string()));
+        assert_eq!(l.next(), Token::Colon);
+        assert_eq!(l.next(), Token::DigitType);
+        assert_eq!(l.next(), Token::Rparen);
+        assert_eq!(l.next(), Token::Arrow);
+        assert_eq!(l.next(), Token::Lparen);
+        assert_eq!(l.next(), Token::Ident("n".to_string()));
+        assert_eq!(l.next(), Token::Rparen);
+        assert_eq!(l.next(), Token::Literal('b'));
     }
 }
