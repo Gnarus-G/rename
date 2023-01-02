@@ -57,7 +57,7 @@ impl MatchAndReplaceExpression {
             .collect();
 
         if strip {
-            regex_pattern.insert_str(0, ".*");
+            regex_pattern.insert_str(0, ".*?");
             regex_pattern.push_str(".*");
         }
 
@@ -354,5 +354,14 @@ mod test {
         let treated = expression.apply(vec!["hello5", "ashello090", "hello345hello"], true);
 
         assert_eq!(treated, vec!["oh5hi", "oh0hi", "oh3hi"]);
+    }
+
+    #[test]
+    fn test_mrp_application_with_multi_digits_and_stripping() {
+        let expression = MatchAndReplaceExpression::from_str("(n:int)->step(n)").unwrap();
+
+        let treated = expression.apply(vec!["f1", "f11", "f99"], true);
+
+        assert_eq!(treated, vec!["step1", "step11", "step99"]);
     }
 }
