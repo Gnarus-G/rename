@@ -1,23 +1,87 @@
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
+use mrp::parser::MatchAndReplaceExpression;
 
 #[derive(Parser, Debug)]
-#[clap(author, version, about)]
-/// A utility for renaming files in bulk, apply a regex replace on each filename.
-struct Args {
+#[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
+/// A utility for renaming paths (files and directories) in bulk.
+struct RenameArgs {
+    #[clap(subcommand)]
+    command: Command,
+
+    /// One or more paths to rename.
+    #[clap(global = true)]
+    paths: Vec<std::path::PathBuf>,
+
+    /// Don't actually rename the files, instead just print each rename that would happen.
+    #[clap(long, global = true)]
+    dry_run: bool,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Use a simple match-and-replace-protocol syntax. (e.g. "hello(n:int)->hi(n)")
+    SIMPLE(SimpleArgs),
+    /// Use and apply a regex replace on each filename
+    REGEX(RegexArgs),
+}
+
+fn main() {
+    let base_args = RenameArgs::parse();
+
+    match &base_args.command {
+        Command::REGEX(args) => handle_regex_replacement(args, &base_args),
+        Command::SIMPLE(args) => handle_mrp_replacement(args, &base_args),
+    }
+}
+
+#[derive(Debug, Args)]
+struct SimpleArgs {
+    /// A Match & Replace expression in the custom MRP syntax.
+    expression: MatchAndReplaceExpression,
+    /// Strip off anything not explicitly matched for while replacting.
+    #[clap(short, long)]
+    strip: bool,
+}
+
+fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
+    let path_strs = base_args
+        .paths
+        .iter()
+        .filter_map(|p| {
+            let str = p.to_str();
+            if str.is_none() {
+                eprintln!("Path is invalid unicode: {:?}", p);
+            }
+            return str;
+        })
+        .collect();
+
+    let replacements = args.expression.apply(path_strs, args.strip);
+
+    base_args
+        .paths
+        .iter()
+        .zip(replacements)
+        .for_each(|(from, to)| {
+            if base_args.dry_run {
+                println!("Rename {:?} to {:?}", from, to);
+            } else {
+                if let Err(err) = std::fs::rename(from, to) {
+                    eprintln!("{:?}: {}", from, err);
+                }
+            }
+        });
+}
+
+#[derive(Debug, Args)]
+struct RegexArgs {
     /// The regex pattern with which to search.
     pattern: regex::Regex,
     /// The replacement format based on the regex capture groups.
     replacement: String,
-    /// One or more files to rename.
-    files: Vec<std::path::PathBuf>,
-
-    #[clap(long)]
-    /// Don't actually rename the files, instead just print each rename that would happen.
-    dry_run: bool,
 }
 
-fn main() {
-    let args = Args::parse();
+fn handle_regex_replacement(args: &RegexArgs, base_args: &RenameArgs) {
     let transform = |name| {
         return (
             name,
@@ -25,13 +89,14 @@ fn main() {
         );
     };
 
-    args.files
+    base_args
+        .paths
         .iter()
-        .for_each(|file| match file.to_str().map(transform) {
-            None => eprintln!("Path is invalid unicode: {:?}", file),
+        .for_each(|path| match path.to_str().map(transform) {
+            None => eprintln!("Path is invalid unicode: {:?}", path),
             Some((from, to)) => {
-                if args.dry_run {
-                    println!("Rename {:?} to {:?}", file, to);
+                if base_args.dry_run {
+                    println!("Rename {:?} to {:?}", path, to);
                 } else {
                     if let Err(err) = std::fs::rename(from, to) {
                         eprintln!("{}: {}", from, err);
