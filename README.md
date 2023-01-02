@@ -22,5 +22,13 @@ Grab a binary (linux or mac) in [releases](https://github.com/Gnarus-G/rename/re
 ```sh
 ./rn simple --help
 ```
+For example to replace `file1`, or `file99` to `1renamed.txt` or `99renamed.txt`, do:
+```sh
+./rn simple "file(n:int)->(n)renamed.txt" file* --help
+```
+or
+```sh
+./rn regex "file(\d+)" '${1}renamed.txt' file* --help
+```
 ## Demo
 ![simplescreenrecorder-2023-01-01_23 51 24](https://user-images.githubusercontent.com/37311893/210196100-96190c6e-9597-4755-a0a0-de86ca407d4a.gif)
