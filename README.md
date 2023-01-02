@@ -2,6 +2,9 @@
 
 A cli tool to rename files in bulk.
 
+## Why?
+I don't like the perl-rename or the rename tool in linux. I could learn to get better at them but I don't want to. Anyway regex can get pretty gaudy and it's not intuitive to me to come with the right pattern on the fly in a timely manner. So I'm experimenting here with a simpler syntax: "hello(n:int)->hi(n)" which reads better and looks self-explanatory. But I don't rename files that often so maybe it doesn't matter.
+
 ## Install (Unix)
 
 ```sh
