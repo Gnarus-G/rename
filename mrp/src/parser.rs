@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{cell::RefCell, str::FromStr};
 
 use crate::{
     error::{ParseError, Result},
@@ -24,7 +24,7 @@ struct ReplaceExpression {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct MatchAndReplaceExpression {
-    regex_pattern: String,
+    regex_pattern: RefCell<String>,
     regex_replacement: String,
 }
 
@@ -72,18 +72,18 @@ impl MatchAndReplaceExpression {
             .collect();
 
         Self {
-            regex_pattern,
+            regex_pattern: RefCell::new(regex_pattern),
             regex_replacement,
         }
     }
 
-    pub fn make_pattern_strip_non_matched_parts(&mut self) {
-        self.regex_pattern.insert_str(0, ".*?");
-        self.regex_pattern.push_str(".*");
+    pub fn make_pattern_strip_non_matched_parts(&self) {
+        self.regex_pattern.borrow_mut().insert_str(0, ".*?");
+        self.regex_pattern.borrow_mut().push_str(".*");
     }
 
     pub fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
-        let pattern = regex::Regex::new(&self.regex_pattern).unwrap();
+        let pattern = regex::Regex::new(&self.regex_pattern.borrow_mut()).unwrap();
 
         if !pattern.is_match(value) {
             return None;
@@ -363,8 +363,7 @@ mod test {
 
     #[test]
     fn test_mrp_application_stripping() {
-        let mut expression =
-            MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+        let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
 
         expression.make_pattern_strip_non_matched_parts();
 
@@ -375,7 +374,7 @@ mod test {
 
     #[test]
     fn test_mrp_application_with_multi_digits_and_stripping() {
-        let mut expression = MatchAndReplaceExpression::from_str("(n:int)->step(n)").unwrap();
+        let expression = MatchAndReplaceExpression::from_str("(n:int)->step(n)").unwrap();
 
         expression.make_pattern_strip_non_matched_parts();
 

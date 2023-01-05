@@ -30,9 +30,9 @@ enum Command {
 fn main() {
     let base_args = RenameArgs::parse();
 
-    match base_args.clone().command {
-        Command::REGEX(args) => handle_regex_replacement(&args, &base_args),
-        Command::SIMPLE(mut args) => {
+    match base_args.command {
+        Command::REGEX(ref args) => handle_regex_replacement(&args, &base_args),
+        Command::SIMPLE(ref args) => {
             if args.strip {
                 args.expression.make_pattern_strip_non_matched_parts();
             }
