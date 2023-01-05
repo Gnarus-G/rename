@@ -87,7 +87,8 @@ impl MatchAndReplaceExpression {
         return pattern.replace(value, &self.regex_replacement);
     }
 
-    pub fn apply_all<'sf, 's: 'sf>(&'s self, values: Vec<&'s str>) -> Vec<std::borrow::Cow<str>> {
+    #[cfg(test)]
+    fn apply_all<'sf, 's: 'sf>(&'s self, values: Vec<&'s str>) -> Vec<std::borrow::Cow<str>> {
         return values.iter().map(|s| self.apply(s)).collect();
     }
 }
