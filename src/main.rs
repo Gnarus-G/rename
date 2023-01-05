@@ -64,6 +64,7 @@ fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
             return str;
         })
         .map(|p| (p, args.expression.apply(p)))
+        .filter_map(|(from, to)| to.map(|t| (from, t)))
         .for_each(|(from, to)| {
             if base_args.dry_run {
                 println!("Rename {:?} to {:?}", from, to);

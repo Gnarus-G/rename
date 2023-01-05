@@ -82,14 +82,18 @@ impl MatchAndReplaceExpression {
         self.regex_pattern.push_str(".*");
     }
 
-    pub fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> std::borrow::Cow<str> {
+    pub fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
         let pattern = regex::Regex::new(&self.regex_pattern).unwrap();
-        return pattern.replace(value, &self.regex_replacement);
+
+        if !pattern.is_match(value) {
+            return None;
+        }
+        return Some(pattern.replace(value, &self.regex_replacement));
     }
 
     #[cfg(test)]
     fn apply_all<'sf, 's: 'sf>(&'s self, values: Vec<&'s str>) -> Vec<std::borrow::Cow<str>> {
-        return values.iter().map(|s| self.apply(s)).collect();
+        return values.iter().filter_map(|s| self.apply(s)).collect();
     }
 }
 
