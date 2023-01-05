@@ -1,7 +1,9 @@
+use std::{path::PathBuf, str::FromStr};
+
 use clap::{Args, Parser, Subcommand};
 use mrp::parser::MatchAndReplaceExpression;
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
 /// A utility for renaming paths (files and directories) in bulk.
 struct RenameArgs {
@@ -17,7 +19,7 @@ struct RenameArgs {
     dry_run: bool,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Subcommand, Clone)]
 enum Command {
     /// Use a simple match-and-replace-protocol syntax. (e.g. "hello(n:int)->hi(n)")
     SIMPLE(SimpleArgs),
@@ -28,13 +30,18 @@ enum Command {
 fn main() {
     let base_args = RenameArgs::parse();
 
-    match &base_args.command {
-        Command::REGEX(args) => handle_regex_replacement(args, &base_args),
-        Command::SIMPLE(args) => handle_mrp_replacement(args, &base_args),
+    match base_args.clone().command {
+        Command::REGEX(args) => handle_regex_replacement(&args, &base_args),
+        Command::SIMPLE(mut args) => {
+            if args.strip {
+                args.expression.make_pattern_strip_non_matched_parts();
+            }
+            handle_mrp_replacement(&args, &base_args)
+        }
     }
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Clone)]
 struct SimpleArgs {
     /// A Match & Replace expression in the custom MRP syntax.
     expression: MatchAndReplaceExpression,
@@ -44,36 +51,31 @@ struct SimpleArgs {
 }
 
 fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
-    let path_strs = base_args
+    base_args
         .paths
         .iter()
         .filter_map(|p| {
             let str = p.to_str();
+
             if str.is_none() {
                 eprintln!("Path is invalid unicode: {:?}", p);
             }
+
             return str;
         })
-        .collect();
-
-    let replacements = args.expression.apply(path_strs, args.strip);
-
-    base_args
-        .paths
-        .iter()
-        .zip(replacements)
+        .map(|p| (p, args.expression.apply(p)))
         .for_each(|(from, to)| {
             if base_args.dry_run {
                 println!("Rename {:?} to {:?}", from, to);
             } else {
-                if let Err(err) = std::fs::rename(from, to) {
+                if let Err(err) = std::fs::rename(from, to.to_string()) {
                     eprintln!("{:?}: {}", from, err);
                 }
             }
         });
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Clone)]
 struct RegexArgs {
     /// The regex pattern with which to search.
     pattern: regex::Regex,

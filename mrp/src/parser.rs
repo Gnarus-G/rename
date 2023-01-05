@@ -22,8 +22,11 @@ struct ReplaceExpression {
     expressions: Vec<Expression>,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct MatchAndReplaceExpression(MatchExpression, ReplaceExpression);
+#[derive(Debug, PartialEq, Clone)]
+pub struct MatchAndReplaceExpression {
+    regex_pattern: String,
+    regex_replacement: String,
+}
 
 impl FromStr for MatchAndReplaceExpression {
     type Err = ParseError;
@@ -34,9 +37,8 @@ impl FromStr for MatchAndReplaceExpression {
 }
 
 impl MatchAndReplaceExpression {
-    pub fn apply(&self, strings: Vec<&str>, strip: bool) -> Vec<String> {
-        let MatchAndReplaceExpression(match_exp, replace_exp) = &self;
-        let mut regex_pattern: String = match_exp
+    fn new(match_exp: MatchExpression, replace_exp: ReplaceExpression) -> Self {
+        let regex_pattern: String = match_exp
             .expressions
             .iter()
             .filter_map(|e| match e {
@@ -56,11 +58,6 @@ impl MatchAndReplaceExpression {
             })
             .collect();
 
-        if strip {
-            regex_pattern.insert_str(0, ".*?");
-            regex_pattern.push_str(".*");
-        }
-
         let regex_replacement: String = replace_exp
             .expressions
             .iter()
@@ -74,12 +71,24 @@ impl MatchAndReplaceExpression {
             })
             .collect();
 
-        let pattern = regex::Regex::new(&regex_pattern).unwrap();
+        Self {
+            regex_pattern,
+            regex_replacement,
+        }
+    }
 
-        return strings
-            .iter()
-            .map(|s| pattern.replace(s, &regex_replacement).to_string())
-            .collect();
+    pub fn make_pattern_strip_non_matched_parts(&mut self) {
+        self.regex_pattern.insert_str(0, ".*?");
+        self.regex_pattern.push_str(".*");
+    }
+
+    pub fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> std::borrow::Cow<str> {
+        let pattern = regex::Regex::new(&self.regex_pattern).unwrap();
+        return pattern.replace(value, &self.regex_replacement);
+    }
+
+    pub fn apply_all<'sf, 's: 'sf>(&'s self, values: Vec<&'s str>) -> Vec<std::borrow::Cow<str>> {
+        return values.iter().map(|s| self.apply(s)).collect();
     }
 }
 
@@ -107,7 +116,7 @@ impl<'l> Parser<'l> {
     }
 
     fn parse(&mut self) -> Result<MatchAndReplaceExpression> {
-        Ok(MatchAndReplaceExpression(
+        Ok(MatchAndReplaceExpression::new(
             self.parse_match_exp()?,
             self.parse_replacement_exp()?,
         ))
@@ -336,31 +345,36 @@ mod test {
         let input = "(num:int)asdf->lul(num)";
         let expression = MatchAndReplaceExpression::from_str(input).unwrap();
 
-        let treated = expression.apply(vec!["124asdf", "3asdfwery", "lk234asdfas"], false);
+        let treated = expression.apply_all(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
 
         assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
 
         let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
 
-        let treated = expression.apply(vec!["hello5", "ashello090", "hello345hello"], false);
+        let treated = expression.apply_all(vec!["hello5", "ashello090", "hello345hello"]);
 
         assert_eq!(treated, vec!["oh5hi", "asoh0hi90", "oh3hi45hello"]);
     }
 
     #[test]
     fn test_mrp_application_stripping() {
-        let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+        let mut expression =
+            MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
 
-        let treated = expression.apply(vec!["hello5", "ashello090", "hello345hello"], true);
+        expression.make_pattern_strip_non_matched_parts();
+
+        let treated = expression.apply_all(vec!["hello5", "ashello090", "hello345hello"]);
 
         assert_eq!(treated, vec!["oh5hi", "oh0hi", "oh3hi"]);
     }
 
     #[test]
     fn test_mrp_application_with_multi_digits_and_stripping() {
-        let expression = MatchAndReplaceExpression::from_str("(n:int)->step(n)").unwrap();
+        let mut expression = MatchAndReplaceExpression::from_str("(n:int)->step(n)").unwrap();
 
-        let treated = expression.apply(vec!["f1", "f11", "f99"], true);
+        expression.make_pattern_strip_non_matched_parts();
+
+        let treated = expression.apply_all(vec!["f1", "f11", "f99"]);
 
         assert_eq!(treated, vec!["step1", "step11", "step99"]);
     }
