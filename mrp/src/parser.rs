@@ -17,6 +17,14 @@ pub struct MatchExpression {
     pub expressions: Vec<Expression>,
 }
 
+impl FromStr for MatchExpression {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Parser::new(Lexer::new(s)).parse_match_exp()
+    }
+}
+
 #[derive(Debug, PartialEq)]
 struct ReplaceExpression {
     expressions: Vec<Expression>,
