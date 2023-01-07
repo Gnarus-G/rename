@@ -6,15 +6,15 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq)]
-enum Expression {
+pub enum Expression {
     Literal(String),
     Identifier(String),
     Capture { identifier: Token, typing: Token },
 }
 
 #[derive(Debug, PartialEq)]
-struct MatchExpression {
-    expressions: Vec<Expression>,
+pub struct MatchExpression {
+    pub expressions: Vec<Expression>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -104,7 +104,7 @@ pub struct Parser<'a> {
 }
 
 impl<'l> Parser<'l> {
-    fn new(lexer: Lexer<'l>) -> Self {
+    pub fn new(lexer: Lexer<'l>) -> Self {
         let mut p = Self {
             lexer,
             token: Token::Eof,
@@ -127,7 +127,7 @@ impl<'l> Parser<'l> {
         ))
     }
 
-    fn parse_match_exp(&mut self) -> Result<MatchExpression> {
+    pub fn parse_match_exp(&mut self) -> Result<MatchExpression> {
         let mut expressions = vec![];
 
         while self.token != Token::Eof {
