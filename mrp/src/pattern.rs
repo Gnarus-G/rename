@@ -1,48 +1,30 @@
-use std::collections::HashMap;
 use std::str::FromStr;
 
-use crate::error;
+use crate::error::ParseError;
 use crate::lexer::{Lexer, Token};
 use crate::parser::{AbstractMatchingExpression, MatchExpression, Parser};
 
 #[cfg(test)]
 impl FromStr for MatchExpression {
-    type Err = error::ParseError;
+    type Err = ParseError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Parser::new(Lexer::new(s)).parse_match_exp()
     }
 }
 
-#[derive(Debug)]
-pub struct MatchFinder<'t, 'p> {
-    pub(crate) text: &'t str,
-    pub(crate) pattern: &'p MatchExpression,
-    captures: HashMap<String, String>,
-    last_end: usize,
-}
-
-impl<'t, 'p> MatchFinder<'t, 'p> {
-    pub fn new(pattern: &'p MatchExpression, text: &'t str) -> Self {
-        Self {
-            text,
-            pattern,
-            last_end: 0,
-            captures: HashMap::new(),
-        }
-    }
-
-    fn find_at(&mut self, start: usize) -> Option<(usize, usize)> {
-        let pattern = self.pattern;
-        let input = self.text;
+impl MatchExpression {
+    fn find_at(&self, input: &str, start: usize) -> Option<(usize, usize)> {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
         let mut cap_start = None;
         let mut found_in_cap = None;
 
-        while state < pattern.expressions.len() && curr_position < input.len() {
-            let e = pattern.expressions.get(state).unwrap();
+        let mut captures_map = self.captures.borrow_mut();
+
+        while state < self.expressions.len() && curr_position < input.len() {
+            let e = self.expressions.get(state).unwrap();
 
             dbg!(curr_position, state);
 
@@ -92,7 +74,7 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
                         } else if found_in_cap.is_some() {
                             // is a match
                             state += 1;
-                            self.captures.insert(
+                            captures_map.insert(
                                 identifier.to_string(),
                                 input[cap_start.unwrap()..curr_position].to_string(),
                             );
@@ -106,15 +88,35 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
             }
         }
 
-        if state == pattern.expressions.len() {
+        if state == self.expressions.len() {
             return Some((legit_start, curr_position));
         }
 
         None
     }
+    pub fn find_iter<'m, 't>(&'m self, text: &'t str) -> Matches<'t, 'm> {
+        Matches::new(self, text)
+    }
 }
 
-impl<'t, 'p> Iterator for MatchFinder<'t, 'p> {
+#[derive(Debug)]
+pub struct Matches<'t, 'm> {
+    pub(crate) text: &'t str,
+    pub(crate) mex: &'m MatchExpression,
+    last_end: usize,
+}
+
+impl<'t, 'm> Matches<'t, 'm> {
+    pub fn new(mex: &'m MatchExpression, text: &'t str) -> Self {
+        Self {
+            text,
+            mex,
+            last_end: 0,
+        }
+    }
+}
+
+impl<'t, 'm> Iterator for Matches<'t, 'm> {
     type Item = (usize, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -122,7 +124,7 @@ impl<'t, 'p> Iterator for MatchFinder<'t, 'p> {
             return None;
         }
 
-        let (s, e) = match self.find_at(self.last_end) {
+        let (s, e) = match self.mex.find_at(self.text, self.last_end) {
             None => return None,
             Some((s, e)) => (s, e),
         };
@@ -134,26 +136,26 @@ impl<'t, 'p> Iterator for MatchFinder<'t, 'p> {
 }
 
 #[cfg(test)]
-fn match_on(pattern: &MatchExpression, input: &str) -> bool {
-    MatchFinder::new(pattern, input).count() > 0
+fn match_on(pattern: MatchExpression, input: &str) -> bool {
+    Matches::new(&pattern, input).count() > 0
 }
 
 #[test]
 fn one() {
     let exp = Parser::new(Lexer::new("abc")).parse_match_exp().unwrap();
-    assert_eq!(match_on(&exp, "b"), false);
+    assert_eq!(match_on(exp, "b"), false);
 }
 
 #[test]
 fn two() {
     let exp = Parser::new(Lexer::new("ab")).parse_match_exp().unwrap();
-    assert_eq!(match_on(&exp, "abc"), true);
+    assert_eq!(match_on(exp, "abc"), true);
 }
 
 #[test]
 fn three() {
     let exp = Parser::new(Lexer::new("abc")).parse_match_exp().unwrap();
-    assert_eq!(match_on(&exp, "abab5"), false);
+    assert_eq!(match_on(exp, "abab5"), false);
 }
 
 #[test]
@@ -161,7 +163,7 @@ fn four() {
     let exp = Parser::new(Lexer::new("ab(n:int)"))
         .parse_match_exp()
         .unwrap();
-    assert_eq!(match_on(&exp, "ab345"), true);
+    assert_eq!(match_on(exp, "ab345"), true);
 }
 
 #[test]
@@ -169,7 +171,7 @@ fn sub_str_at_the_end() {
     let exp = Parser::new(Lexer::new("ab(n:int)"))
         .parse_match_exp()
         .unwrap();
-    assert_eq!(match_on(&exp, "helloab345"), true);
+    assert_eq!(match_on(exp, "helloab345"), true);
 }
 
 #[test]
@@ -177,22 +179,23 @@ fn five() {
     let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
         .parse_match_exp()
         .unwrap();
-    assert_eq!(match_on(&exp, "abb"), false);
+    assert_eq!(match_on(exp, "abb"), false);
 }
 
 #[test]
-fn six() {
+fn two_capture_groups() {
     let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
         .parse_match_exp()
         .unwrap();
-    assert_eq!(match_on(&exp, "ab321love78"), true);
+
+    assert_eq!(match_on(exp, "ab321love78"), true);
 }
 
 #[test]
 fn muliple_matches() {
     let pattern = MatchExpression::from_str("xy(n:int)").unwrap();
     let text = "wxy10xy33asdfxy81";
-    let mut matches = MatchFinder::new(&pattern, text);
+    let mut matches = Matches::new(&pattern, text);
 
     assert_eq!(matches.next(), Some((1, 5)));
     assert_eq!(matches.next(), Some((5, 9)));

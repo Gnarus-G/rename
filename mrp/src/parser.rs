@@ -1,4 +1,4 @@
-use std::{cell::RefCell, str::FromStr};
+use std::{cell::RefCell, collections::HashMap, str::FromStr};
 
 use crate::{
     error::{ParseError, Result},
@@ -20,6 +20,16 @@ enum AbstractReplaceExpression {
 #[derive(Debug, PartialEq)]
 pub struct MatchExpression {
     pub expressions: Vec<AbstractMatchingExpression>,
+    pub captures: RefCell<HashMap<String, String>>,
+}
+
+impl MatchExpression {
+    pub fn new(expressions: Vec<AbstractMatchingExpression>) -> Self {
+        Self {
+            expressions,
+            captures: RefCell::new(HashMap::new()),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -151,7 +161,7 @@ impl<'l> Parser<'l> {
             self.advance();
         }
 
-        Ok(MatchExpression { expressions })
+        Ok(MatchExpression::new(expressions))
     }
 
     fn parse_literal(&mut self, first_char: char) -> String {
@@ -222,9 +232,7 @@ mod test {
 
         assert_eq!(
             p.parse_match_exp().unwrap(),
-            MatchExpression {
-                expressions: vec![AbstractMatchingExpression::Literal("abc".to_string())]
-            }
+            MatchExpression::new(vec![AbstractMatchingExpression::Literal("abc".to_string())])
         );
 
         let input = "1234";
@@ -232,9 +240,9 @@ mod test {
 
         assert_eq!(
             p.parse_match_exp().unwrap(),
-            MatchExpression {
-                expressions: vec![AbstractMatchingExpression::Literal("1234".to_string())]
-            }
+            MatchExpression::new(vec![AbstractMatchingExpression::Literal(
+                "1234".to_string()
+            )],)
         )
     }
 
@@ -245,13 +253,11 @@ mod test {
 
         assert_eq!(
             p.parse_match_exp().unwrap(),
-            MatchExpression {
-                expressions: vec![AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("num".to_string()),
+            MatchExpression::new(vec![AbstractMatchingExpression::Capture {
+                identifier: Token::Ident("num".to_string()),
 
-                    typing: Token::IntType
-                }]
-            }
+                typing: Token::IntType
+            }])
         );
     }
 
@@ -262,16 +268,14 @@ mod test {
 
         assert_eq!(
             p.parse_match_exp().unwrap(),
-            MatchExpression {
-                expressions: vec![
-                    AbstractMatchingExpression::Literal("abc".to_string()),
-                    AbstractMatchingExpression::Capture {
-                        identifier: Token::Ident("d".to_string()),
+            MatchExpression::new(vec![
+                AbstractMatchingExpression::Literal("abc".to_string()),
+                AbstractMatchingExpression::Capture {
+                    identifier: Token::Ident("d".to_string()),
 
-                        typing: Token::DigitType
-                    }
-                ]
-            }
+                    typing: Token::DigitType
+                }
+            ])
         )
     }
 
@@ -282,27 +286,25 @@ mod test {
 
         assert_eq!(
             p.parse_match_exp().unwrap(),
-            MatchExpression {
-                expressions: vec![
-                    AbstractMatchingExpression::Literal("abc235".to_string()),
-                    AbstractMatchingExpression::Capture {
-                        identifier: Token::Ident("d".to_string()),
+            MatchExpression::new(vec![
+                AbstractMatchingExpression::Literal("abc235".to_string()),
+                AbstractMatchingExpression::Capture {
+                    identifier: Token::Ident("d".to_string()),
 
-                        typing: Token::DigitType
-                    },
-                    AbstractMatchingExpression::Literal("zap".to_string()),
-                    AbstractMatchingExpression::Capture {
-                        identifier: Token::Ident("num".to_string()),
+                    typing: Token::DigitType
+                },
+                AbstractMatchingExpression::Literal("zap".to_string()),
+                AbstractMatchingExpression::Capture {
+                    identifier: Token::Ident("num".to_string()),
 
-                        typing: Token::IntType
-                    },
-                    AbstractMatchingExpression::Capture {
-                        identifier: Token::Ident("d".to_string()),
+                    typing: Token::IntType
+                },
+                AbstractMatchingExpression::Capture {
+                    identifier: Token::Ident("d".to_string()),
 
-                        typing: Token::IntType
-                    },
-                ]
-            }
+                    typing: Token::IntType
+                },
+            ])
         )
     }
 
@@ -326,16 +328,14 @@ mod test {
 
         assert_eq!(
             p.parse_match_exp().unwrap(),
-            MatchExpression {
-                expressions: vec![
-                    AbstractMatchingExpression::Capture {
-                        identifier: Token::Ident("num".to_string()),
+            MatchExpression::new(vec![
+                AbstractMatchingExpression::Capture {
+                    identifier: Token::Ident("num".to_string()),
 
-                        typing: Token::IntType
-                    },
-                    AbstractMatchingExpression::Literal("asdf".to_string()),
-                ]
-            }
+                    typing: Token::IntType
+                },
+                AbstractMatchingExpression::Literal("asdf".to_string()),
+            ])
         );
 
         assert_eq!(

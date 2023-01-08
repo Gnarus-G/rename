@@ -11,25 +11,25 @@ use std::str::{
 };
 
 use parser::MatchExpression;
-use pattern::MatchFinder;
+use pattern::Matches;
 
-pub struct MrpSearcher<'t, 'p> {
+pub struct MexSearcher<'t, 'm> {
     haystack: &'t str,
-    it: MatchFinder<'t, 'p>,
+    it: Matches<'t, 'm>,
 }
 
-impl<'p, 't> Pattern<'t> for &'p MatchExpression {
-    type Searcher = MrpSearcher<'t, 'p>;
+impl<'m: 't, 't> Pattern<'t> for &'m MatchExpression {
+    type Searcher = MexSearcher<'t, 'm>;
 
     fn into_searcher(self, haystack: &'t str) -> Self::Searcher {
-        MrpSearcher {
+        MexSearcher {
             haystack,
-            it: MatchFinder::new(&self, haystack),
+            it: self.find_iter(haystack),
         }
     }
 }
 
-unsafe impl<'p, 't> Searcher<'t> for MrpSearcher<'t, 'p> {
+unsafe impl<'t, 'm> Searcher<'t> for MexSearcher<'t, 'm> {
     #[inline]
     fn haystack(&self) -> &'t str {
         self.haystack
