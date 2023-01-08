@@ -2,53 +2,49 @@ use crate::lexer::{Lexer, Token};
 use crate::parser::{Expression, MatchExpression, Parser};
 
 #[derive(Debug)]
-pub(crate) struct Match<'t> {
-    pub text: &'t str,
-    pub start: usize,
-    pub end: usize,
-}
-
-#[derive(Debug)]
 pub struct MatchFinder<'t, 'p> {
     pub(crate) text: &'t str,
     pub(crate) pattern: &'p MatchExpression,
+    last_end: usize,
 }
 
 impl<'t, 'p> MatchFinder<'t, 'p> {
     pub fn new(pattern: &'p MatchExpression, text: &'t str) -> Self {
-        Self { text, pattern }
-    }
-
-    pub(crate) fn find(&mut self) -> Option<Match<'t>> {
-        if let Some((s, e)) = self.find_at(0) {
-            return Some(Match {
-                text: self.text,
-                start: s,
-                end: e,
-            });
+        Self {
+            text,
+            pattern,
+            last_end: 0,
         }
-
-        None
     }
 
     fn find_at(&mut self, start: usize) -> Option<(usize, usize)> {
         let pattern = self.pattern;
         let input = self.text;
         let mut curr_position = start;
+        let mut legit_start = start;
         let mut state = 0;
         let mut cap_start = None;
         let mut found_in_cap = None;
 
         while state < pattern.expressions.len() && curr_position < input.len() {
             let e = pattern.expressions.get(state).unwrap();
+
+            dbg!(curr_position, state);
+
             match e {
                 Expression::Literal(literal) => {
-                    dbg!(literal, input);
-                    if literal.len() > input.len() {
-                        return None;
+                    let lit_end_in_input = literal.len() + curr_position;
+                    let lit_range = curr_position..lit_end_in_input;
+
+                    if lit_range.end > input.len() {
+                        curr_position = lit_end_in_input - 1;
+                        legit_start = curr_position;
+                        continue;
                     }
 
-                    let sub_str = &input[curr_position..literal.len() + curr_position];
+                    dbg!(literal, &lit_range);
+
+                    let sub_str = &input[lit_range];
 
                     let is_match = sub_str == *literal;
 
@@ -56,9 +52,11 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
 
                     if is_match {
                         state += 1;
-                        curr_position = literal.len() + curr_position
+                        curr_position = literal.len() + curr_position;
                     } else {
-                        return None;
+                        curr_position = lit_end_in_input - 1;
+                        legit_start = curr_position;
+                        continue;
                     }
                 }
                 Expression::Capture { identifier, typing } => match typing {
@@ -89,20 +87,37 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
                 },
                 Expression::Identifier(_) => todo!(),
             }
-
-            dbg!(e, curr_position, state, &input[..curr_position]);
         }
 
         if state == pattern.expressions.len() {
-            return Some((start, curr_position));
+            return Some((legit_start, curr_position));
         }
 
         None
     }
 }
 
+impl<'t, 'p> Iterator for MatchFinder<'t, 'p> {
+    type Item = (usize, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.last_end >= self.text.len() {
+            return None;
+        }
+
+        let (s, e) = match self.find_at(self.last_end) {
+            None => return None,
+            Some((s, e)) => (s, e),
+        };
+
+        self.last_end = e;
+
+        Some((s, e))
+    }
+}
+
 fn match_on(pattern: &MatchExpression, input: &str) -> bool {
-    MatchFinder::new(pattern, input).find().is_some()
+    MatchFinder::new(pattern, input).count() > 0
 }
 
 #[test]
@@ -129,6 +144,14 @@ fn four() {
         .parse_match_exp()
         .unwrap();
     assert_eq!(match_on(&exp, "ab345"), true);
+}
+
+#[test]
+fn sub_str_at_the_end() {
+    let exp = Parser::new(Lexer::new("ab(n:int)"))
+        .parse_match_exp()
+        .unwrap();
+    assert_eq!(match_on(&exp, "helloab345"), true);
 }
 
 #[test]

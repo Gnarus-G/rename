@@ -24,7 +24,7 @@ impl<'p, 't> Pattern<'t> for &'p MatchExpression {
         let mut finder = pattern::MatchFinder::new(&self, haystack);
         MrpSearcher {
             haystack,
-            next_match: finder.find().map(|m| (m.start, m.end)),
+            next_match: finder.next(),
         }
     }
 }
@@ -62,6 +62,17 @@ fn one_substr_with_extra_end_match() {
     let pattern = MatchExpression::from_str("abc(n:int)").unwrap();
 
     assert_eq!(text.find(&pattern).unwrap(), 0);
+    assert_eq!(text.contains(&pattern), true);
+    assert_eq!(text.matches(&pattern).next(), Some("abc235"));
+    assert_eq!(text.matches(&pattern).count(), 1);
+}
+
+#[test]
+fn one_substr_with_extra_at_beginning_match() {
+    let text = "aaabc235";
+    let pattern = MatchExpression::from_str("abc(n:int)").unwrap();
+
+    assert_eq!(text.find(&pattern).unwrap(), 2);
     assert_eq!(text.contains(&pattern), true);
     assert_eq!(text.matches(&pattern).next(), Some("abc235"));
     assert_eq!(text.matches(&pattern).count(), 1);
