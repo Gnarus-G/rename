@@ -1,8 +1,18 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
+use crate::error;
 use crate::lexer::{Lexer, Token};
-use crate::parser::{Expression, MatchExpression, Parser};
+use crate::parser::{AbstractMatchingExpression, MatchExpression, Parser};
+
+#[cfg(test)]
+impl FromStr for MatchExpression {
+    type Err = error::ParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Parser::new(Lexer::new(s)).parse_match_exp()
+    }
+}
 
 #[derive(Debug)]
 pub struct MatchFinder<'t, 'p> {
@@ -37,7 +47,7 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
             dbg!(curr_position, state);
 
             match e {
-                Expression::Literal(literal) => {
+                AbstractMatchingExpression::Literal(literal) => {
                     let lit_end_in_input = literal.len() + curr_position;
                     let lit_range = curr_position..lit_end_in_input;
 
@@ -64,7 +74,7 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
                         continue;
                     }
                 }
-                Expression::Capture { identifier, typing } => match typing {
+                AbstractMatchingExpression::Capture { identifier, typing } => match typing {
                     Token::DigitType => todo!(),
                     Token::IntType => {
                         let ch = input.as_bytes()[curr_position] as char;
@@ -93,7 +103,6 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
                     }
                     _ => todo!(),
                 },
-                Expression::Identifier(_) => todo!(),
             }
         }
 
@@ -124,6 +133,7 @@ impl<'t, 'p> Iterator for MatchFinder<'t, 'p> {
     }
 }
 
+#[cfg(test)]
 fn match_on(pattern: &MatchExpression, input: &str) -> bool {
     MatchFinder::new(pattern, input).count() > 0
 }
