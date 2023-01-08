@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str::FromStr;
 
 use crate::lexer::{Lexer, Token};
@@ -7,6 +8,7 @@ use crate::parser::{Expression, MatchExpression, Parser};
 pub struct MatchFinder<'t, 'p> {
     pub(crate) text: &'t str,
     pub(crate) pattern: &'p MatchExpression,
+    captures: HashMap<String, String>,
     last_end: usize,
 }
 
@@ -16,6 +18,7 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
             text,
             pattern,
             last_end: 0,
+            captures: HashMap::new(),
         }
     }
 
@@ -79,7 +82,10 @@ impl<'t, 'p> MatchFinder<'t, 'p> {
                         } else if found_in_cap.is_some() {
                             // is a match
                             state += 1;
-                            // e.set_value(input[cap_start.unwrap()..curr_position].to_string());
+                            self.captures.insert(
+                                identifier.to_string(),
+                                input[cap_start.unwrap()..curr_position].to_string(),
+                            );
                         } else {
                             curr_position += 1;
                             state = 0;

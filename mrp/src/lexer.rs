@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Literal(char),
@@ -9,6 +11,22 @@ pub enum Token {
     Colon,
     Arrow,
     Eof,
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        return match self {
+            Token::Literal(l) => write!(f, "{l}"),
+            Token::Lparen => write!(f, "("),
+            Token::Rparen => write!(f, ")"),
+            Token::DigitType => write!(f, "dig"),
+            Token::IntType => write!(f, "int"),
+            Token::Ident(i) => write!(f, "{i}"),
+            Token::Colon => write!(f, ":"),
+            Token::Arrow => write!(f, "->"),
+            Token::Eof => write!(f, "\0"),
+        };
+    }
 }
 
 #[derive(Debug, PartialEq)]
