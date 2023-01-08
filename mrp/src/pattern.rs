@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::lexer::{Lexer, Token};
 use crate::parser::{Expression, MatchExpression, Parser};
 
@@ -168,4 +170,15 @@ fn six() {
         .parse_match_exp()
         .unwrap();
     assert_eq!(match_on(&exp, "ab321love78"), true);
+}
+
+#[test]
+fn muliple_matches() {
+    let pattern = MatchExpression::from_str("xy(n:int)").unwrap();
+    let text = "wxy10xy33asdfxy81";
+    let mut matches = MatchFinder::new(&pattern, text);
+
+    assert_eq!(matches.next(), Some((1, 5)));
+    assert_eq!(matches.next(), Some((5, 9)));
+    assert_eq!(matches.next(), Some((13, text.len())));
 }
