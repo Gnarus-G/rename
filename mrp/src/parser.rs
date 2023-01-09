@@ -51,8 +51,8 @@ impl<'l> Parser<'l> {
     pub fn new(lexer: Lexer<'l>) -> Self {
         let mut p = Self {
             lexer,
-            token: Token::Eof,
-            peek_token: Token::Eof,
+            token: Token::End,
+            peek_token: Token::End,
         };
         p.advance();
         p.advance();
@@ -67,7 +67,7 @@ impl<'l> Parser<'l> {
     pub fn parse_match_exp(&mut self) -> Result<MatchExpression> {
         let mut expressions = vec![];
 
-        while self.token != Token::Eof {
+        while self.token != Token::End {
             let exp = match &self.token {
                 Token::Literal(l) => {
                     AbstractMatchingExpression::Literal(self.parse_literal(l.clone()))
@@ -128,7 +128,7 @@ impl<'l> Parser<'l> {
     pub fn parse_replacement_exp(&mut self) -> Result<ReplaceExpression> {
         let mut expressions = vec![];
 
-        while self.token != Token::Eof {
+        while self.token != Token::End {
             let exp = match &self.token {
                 Token::Literal(l) => {
                     AbstractReplaceExpression::Literal(self.parse_literal(l.clone()))

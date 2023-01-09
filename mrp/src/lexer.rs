@@ -10,7 +10,7 @@ pub enum Token {
     Ident(String),
     Colon,
     Arrow,
-    Eof,
+    End,
 }
 
 impl Display for Token {
@@ -24,7 +24,7 @@ impl Display for Token {
             Token::Ident(i) => write!(f, "{i}"),
             Token::Colon => write!(f, ":"),
             Token::Arrow => write!(f, "->"),
-            Token::Eof => write!(f, "\0"),
+            Token::End => write!(f, "\0"),
         };
     }
 }
@@ -96,7 +96,7 @@ impl<'a> Lexer<'a> {
                 self.read_char();
                 Token::Arrow
             }
-            c if c == NO_CHAR => Token::Eof,
+            c if c == NO_CHAR => Token::End,
             c if c.is_ascii_alphabetic() && self.mode == LexingMode::String => {
                 let str = self.read_while(|c| c.is_ascii_alphabetic());
                 return match str {
