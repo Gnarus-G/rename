@@ -23,6 +23,7 @@ impl<'t> Match<'t> {
 }
 
 impl MatchExpression {
+    /// Find the leftmost-first match in the input starting at the given position
     pub fn find_at<'t>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
         let mut curr_position = start;
         let mut legit_start = start;

@@ -12,7 +12,9 @@ use parser::{
     ReplaceExpression,
 };
 
-pub trait MRP {
+/// Representing a stragety by which to match and replace on a `string` value
+pub trait MatchAndReplaceStrategy {
+    /// Match and replace
     fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>>;
 }
 
@@ -34,17 +36,24 @@ impl FromStr for MatchAndReplaceExpression {
     }
 }
 
-pub struct InHouseStrategy<'m> {
+pub struct DefaultMatchAndReplaceStrategy<'m> {
     mrex: &'m MatchAndReplaceExpression,
+    /// When true, this strategy will replace the matching range found, and strip everything else
+    /// off.
+    strip: bool,
 }
 
-impl<'m> InHouseStrategy<'m> {
+impl<'m> DefaultMatchAndReplaceStrategy<'m> {
     pub fn new(mrex: &'m MatchAndReplaceExpression) -> Self {
-        Self { mrex }
+        Self { mrex, strip: false }
+    }
+
+    pub fn set_strip(&mut self, s: bool) {
+        self.strip = s;
     }
 }
 
-impl<'m> MRP for InHouseStrategy<'m> {
+impl<'m> MatchAndReplaceStrategy for DefaultMatchAndReplaceStrategy<'m> {
     fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
         match self.mrex.mex.find_at(value, 0) {
             None => None,
@@ -65,7 +74,12 @@ impl<'m> MRP for InHouseStrategy<'m> {
                     })
                     .collect();
 
-                new.to_mut().replace_range(m.start..m.end, &replacement_str);
+                if self.strip {
+                    new = Cow::from(replacement_str);
+                } else {
+                    new.to_mut().replace_range(m.start..m.end, &replacement_str);
+                }
+
                 Some(new)
             }
         }
@@ -124,7 +138,7 @@ impl RegexTranspilationStrategy {
     }
 }
 
-impl MRP for RegexTranspilationStrategy {
+impl MatchAndReplaceStrategy for RegexTranspilationStrategy {
     fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
         let pattern = &self.regex;
 
@@ -134,12 +148,11 @@ impl MRP for RegexTranspilationStrategy {
         return Some(pattern.replace(value, &self.replacement));
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    impl<'m> InHouseStrategy<'m> {
+    impl<'m> DefaultMatchAndReplaceStrategy<'m> {
         fn apply_all<'sf, 's: 'sf>(&'s self, values: Vec<&'s str>) -> Vec<std::borrow::Cow<str>> {
             return values.iter().filter_map(|s| self.apply(s)).collect();
         }
@@ -149,7 +162,7 @@ mod tests {
     fn one_literal_and_int_capture() {
         let input = "lit(num:int)->lul(num)";
         let expression = MatchAndReplaceExpression::from_str(input).unwrap();
-        let strat = InHouseStrategy::new(&expression);
+        let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         assert_eq!(strat.apply("lit12").unwrap(), "lul12");
     }
@@ -158,7 +171,7 @@ mod tests {
     fn test_mrp_application() {
         let input = "(num:int)asdf->lul(num)";
         let expression = MatchAndReplaceExpression::from_str(input).unwrap();
-        let strat = InHouseStrategy::new(&expression);
+        let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         let treated = strat.apply_all(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
 
@@ -166,11 +179,35 @@ mod tests {
 
         let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
 
-        let strat = InHouseStrategy::new(&expression);
+        let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         let treated = strat.apply_all(vec!["hello5", "ashello090", "hello345hello"]);
 
         assert_eq!(treated, vec!["oh5hi", "asoh0hi90", "oh3hi45hello"]);
+    }
+
+    #[test]
+    fn test_mrp_application_stripping() {
+        let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+        let mut strat = DefaultMatchAndReplaceStrategy::new(&expression);
+
+        strat.set_strip(true);
+
+        let treated = strat.apply_all(vec!["hello5", "ashello090", "hello345hello"]);
+
+        assert_eq!(treated, vec!["oh5hi", "oh0hi", "oh3hi"]);
+    }
+
+    #[test]
+    fn test_mrp_application_with_multi_digits_and_stripping() {
+        let expression = MatchAndReplaceExpression::from_str("(n:int)->step(n)").unwrap();
+        let mut strat = DefaultMatchAndReplaceStrategy::new(&expression);
+
+        strat.set_strip(true);
+
+        let treated = strat.apply_all(vec!["f1", "f11", "f99"]);
+
+        assert_eq!(treated, vec!["step1", "step11", "step99"]);
     }
 
     mod regex_imp {

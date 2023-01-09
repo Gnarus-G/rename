@@ -1,5 +1,5 @@
 use clap::{Args, Parser, Subcommand};
-use mrp::{MatchAndReplaceExpression, RegexTranspilationStrategy, MRP};
+use mrp::{DefaultMatchAndReplaceStrategy, MatchAndReplaceExpression, MatchAndReplaceStrategy};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
@@ -44,11 +44,9 @@ struct SimpleArgs {
 }
 
 fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
-    let mut replace_strat = RegexTranspilationStrategy::new(&args.expression);
+    let mut replace = DefaultMatchAndReplaceStrategy::new(&args.expression);
 
-    if args.strip {
-        replace_strat.make_pattern_strip_non_matched_parts()
-    }
+    replace.set_strip(args.strip);
 
     base_args
         .paths
@@ -62,7 +60,7 @@ fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
 
             return str;
         })
-        .map(|p| (p, replace_strat.apply(p)))
+        .map(|p| (p, replace.apply(p)))
         .filter_map(|(from, to)| to.map(|t| (from, t)))
         .for_each(|(from, to)| {
             if base_args.dry_run {
