@@ -33,7 +33,7 @@ impl MatchExpression {
         let mut cap_start = None;
         let mut found_in_cap = None;
 
-        let mut captures_map = self.captures();
+        let mut captures_map = self.captures.borrow_mut();
 
         while state < self.expressions.len() && curr_position < input.len() {
             let e = self.expressions.get(state).unwrap();
@@ -207,8 +207,8 @@ fn two_capture_groups() {
     let text = "ab321love78";
 
     assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
-    assert_eq!(exp.captures().get("n").unwrap(), "321");
-    assert_eq!(exp.captures().get("i").unwrap(), "78");
+    assert_eq!(exp.get_capture("n").unwrap(), "321");
+    assert_eq!(exp.get_capture("i").unwrap(), "78");
 }
 
 #[test]

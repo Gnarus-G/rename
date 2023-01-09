@@ -24,7 +24,7 @@ enum AbstractReplaceExpression {
 #[derive(Debug, PartialEq)]
 pub struct MatchExpression {
     pub expressions: Vec<AbstractMatchingExpression>,
-    captures: RefCell<HashMap<String, String>>,
+    pub captures: RefCell<HashMap<String, String>>,
 }
 
 impl MatchExpression {
@@ -35,8 +35,8 @@ impl MatchExpression {
         }
     }
 
-    pub fn captures(&self) -> RefMut<'_, HashMap<String, String>> {
-        self.captures.borrow_mut()
+    pub fn get_capture(&self, name: &str) -> Option<String> {
+        self.captures.borrow().get(name).map(|s| s.to_string())
     }
 }
 
