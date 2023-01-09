@@ -1,15 +1,12 @@
-use std::str::FromStr;
-
-use crate::error::ParseError;
-use crate::lexer::{Lexer, Token};
-use crate::parser::{AbstractMatchingExpression, MatchExpression, Parser};
+use crate::lexer::Token;
+use crate::parser::{AbstractMatchingExpression, MatchExpression};
 
 #[cfg(test)]
-impl FromStr for MatchExpression {
-    type Err = ParseError;
+impl std::str::FromStr for MatchExpression {
+    type Err = crate::error::ParseError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        Parser::new(Lexer::new(s)).parse_match_exp()
+        crate::parser::Parser::new(crate::lexer::Lexer::new(s)).parse_match_exp()
     }
 }
 
@@ -20,7 +17,7 @@ pub struct Match<'t> {
 }
 
 impl<'t> Match<'t> {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         &self.text[self.start..self.end]
     }
 }
@@ -172,6 +169,10 @@ impl<'t, 'm> Iterator for Matches<'t, 'm> {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
+    use crate::{lexer::Lexer, parser::Parser};
+
     use super::*;
 
     fn match_on(pattern: MatchExpression, input: &str) -> bool {

@@ -1,8 +1,4 @@
-use std::{
-    cell::{RefCell, RefMut},
-    collections::HashMap,
-    str::FromStr,
-};
+use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     error::{ParseError, Result},
@@ -155,7 +151,6 @@ impl<'l> Parser<'l> {
 
 #[cfg(test)]
 mod tests {
-    use crate::RegexTranspilationStrategy;
 
     use super::*;
 
