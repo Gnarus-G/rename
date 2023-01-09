@@ -13,20 +13,30 @@ impl FromStr for MatchExpression {
     }
 }
 
+pub struct Match<'t> {
+    text: &'t str,
+    pub start: usize,
+    pub end: usize,
+}
+
+impl<'t> Match<'t> {
+    fn as_str(&self) -> &str {
+        &self.text[self.start..self.end]
+    }
+}
+
 impl MatchExpression {
-    fn find_at(&self, input: &str, start: usize) -> Option<(usize, usize)> {
+    fn find_at<'t>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
         let mut cap_start = None;
         let mut found_in_cap = None;
 
-        let mut captures_map = self.captures.borrow_mut();
+        let mut captures_map = self.captures();
 
         while state < self.expressions.len() && curr_position < input.len() {
             let e = self.expressions.get(state).unwrap();
-
-            dbg!(curr_position, state);
 
             match e {
                 AbstractMatchingExpression::Literal(literal) => {
@@ -39,13 +49,9 @@ impl MatchExpression {
                         continue;
                     }
 
-                    dbg!(literal, &lit_range);
-
                     let sub_str = &input[lit_range];
 
                     let is_match = sub_str == *literal;
-
-                    dbg!(is_match, sub_str);
 
                     if is_match {
                         state += 1;
@@ -64,32 +70,40 @@ impl MatchExpression {
                             cap_start = Some(curr_position);
                         }
 
-                        if ch.is_ascii_digit() {
-                            found_in_cap = Some(true);
-                            curr_position += 1;
-
-                            if curr_position == input.len() {
-                                state += 1;
-                            }
-                        } else if found_in_cap.is_some() {
-                            // is a match
+                        let mut capture = |curr_position: usize| {
                             state += 1;
                             captures_map.insert(
                                 identifier.to_string(),
                                 input[cap_start.unwrap()..curr_position].to_string(),
                             );
+                            cap_start = None;
+                        };
+
+                        if ch.is_ascii_digit() {
+                            found_in_cap = Some(true);
+                            curr_position += 1;
+
+                            if curr_position == input.len() {
+                                capture(curr_position);
+                            }
+                        } else if found_in_cap.is_some() {
+                            capture(curr_position);
                         } else {
                             curr_position += 1;
                             state = 0;
                         }
                     }
-                    _ => todo!(),
+                    t => panic!("{t} is an invalid capture type"),
                 },
             }
         }
 
         if state == self.expressions.len() {
-            return Some((legit_start, curr_position));
+            return Some(Match {
+                text: input,
+                start: legit_start,
+                end: curr_position,
+            });
         }
 
         None
@@ -117,21 +131,21 @@ impl<'t, 'm> Matches<'t, 'm> {
 }
 
 impl<'t, 'm> Iterator for Matches<'t, 'm> {
-    type Item = (usize, usize);
+    type Item = Match<'t>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.last_end >= self.text.len() {
             return None;
         }
 
-        let (s, e) = match self.mex.find_at(self.text, self.last_end) {
+        let m = match self.mex.find_at(self.text, self.last_end) {
             None => return None,
-            Some((s, e)) => (s, e),
+            Some(m) => m,
         };
 
-        self.last_end = e;
+        self.last_end = m.end;
 
-        Some((s, e))
+        Some(m)
     }
 }
 
@@ -187,8 +201,11 @@ fn two_capture_groups() {
     let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
         .parse_match_exp()
         .unwrap();
+    let text = "ab321love78";
 
-    assert_eq!(match_on(exp, "ab321love78"), true);
+    assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
+    assert_eq!(exp.captures().get("n").unwrap(), "321");
+    assert_eq!(exp.captures().get("i").unwrap(), "78");
 }
 
 #[test]
@@ -197,7 +214,7 @@ fn muliple_matches() {
     let text = "wxy10xy33asdfxy81";
     let mut matches = Matches::new(&pattern, text);
 
-    assert_eq!(matches.next(), Some((1, 5)));
-    assert_eq!(matches.next(), Some((5, 9)));
-    assert_eq!(matches.next(), Some((13, text.len())));
+    assert_eq!(matches.next().unwrap().as_str(), "xy10");
+    assert_eq!(matches.next().unwrap().as_str(), "xy33");
+    assert_eq!(matches.next().unwrap().as_str(), "xy81");
 }

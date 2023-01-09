@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, str::FromStr};
+use std::{
+    cell::{RefCell, RefMut},
+    collections::HashMap,
+    str::FromStr,
+};
 
 use crate::{
     error::{ParseError, Result},
@@ -20,7 +24,7 @@ enum AbstractReplaceExpression {
 #[derive(Debug, PartialEq)]
 pub struct MatchExpression {
     pub expressions: Vec<AbstractMatchingExpression>,
-    pub captures: RefCell<HashMap<String, String>>,
+    captures: RefCell<HashMap<String, String>>,
 }
 
 impl MatchExpression {
@@ -29,6 +33,10 @@ impl MatchExpression {
             expressions,
             captures: RefCell::new(HashMap::new()),
         }
+    }
+
+    pub fn captures(&self) -> RefMut<'_, HashMap<String, String>> {
+        self.captures.borrow_mut()
     }
 }
 

@@ -38,7 +38,7 @@ unsafe impl<'t, 'm> Searcher<'t> for MexSearcher<'t, 'm> {
     #[inline]
     fn next(&mut self) -> SearchStep {
         match self.it.next() {
-            Some((s, e)) => SearchStep::Match(s, e),
+            Some(m) => SearchStep::Match(m.start, m.end),
             None => SearchStep::Done,
         }
     }
