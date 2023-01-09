@@ -1,9 +1,9 @@
 use std::{path::PathBuf, str::FromStr};
 
 use clap::{Args, Parser, Subcommand};
-use mrp::parser::MatchAndReplaceExpression;
+use mrp::{MatchAndReplaceExpression, RegexTranspilationStrategy, MRP};
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug)]
 #[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
 /// A utility for renaming paths (files and directories) in bulk.
 struct RenameArgs {
@@ -19,7 +19,7 @@ struct RenameArgs {
     dry_run: bool,
 }
 
-#[derive(Debug, Subcommand, Clone)]
+#[derive(Debug, Subcommand)]
 enum Command {
     /// Use a simple match-and-replace-protocol syntax. (e.g. "hello(n:int)->hi(n)")
     SIMPLE(SimpleArgs),
@@ -32,16 +32,11 @@ fn main() {
 
     match base_args.command {
         Command::REGEX(ref args) => handle_regex_replacement(&args, &base_args),
-        Command::SIMPLE(ref args) => {
-            if args.strip {
-                args.expression.make_pattern_strip_non_matched_parts();
-            }
-            handle_mrp_replacement(&args, &base_args)
-        }
+        Command::SIMPLE(ref args) => handle_mrp_replacement(&args, &base_args),
     }
 }
 
-#[derive(Debug, Args, Clone)]
+#[derive(Debug, Args)]
 struct SimpleArgs {
     /// A Match & Replace expression in the custom MRP syntax.
     expression: MatchAndReplaceExpression,
@@ -51,6 +46,12 @@ struct SimpleArgs {
 }
 
 fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
+    let mut replace_strat = RegexTranspilationStrategy::new(&args.expression);
+
+    if args.strip {
+        replace_strat.make_pattern_strip_non_matched_parts()
+    }
+
     base_args
         .paths
         .iter()
@@ -63,7 +64,7 @@ fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
 
             return str;
         })
-        .map(|p| (p, args.expression.apply(p)))
+        .map(|p| (p, replace_strat.apply(p)))
         .filter_map(|(from, to)| to.map(|t| (from, t)))
         .for_each(|(from, to)| {
             if base_args.dry_run {
