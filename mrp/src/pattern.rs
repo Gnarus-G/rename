@@ -40,25 +40,28 @@ impl MatchExpression {
 
             match e {
                 AbstractMatchingExpression::Literal(literal) => {
-                    let lit_end_in_input = literal.len() + curr_position;
-                    let lit_range = curr_position..lit_end_in_input;
+                    let slice_end = literal.len() + curr_position;
+                    let slice_range = curr_position..slice_end;
 
-                    if lit_range.end > input.len() {
-                        curr_position = lit_end_in_input - 1;
+                    let mut update_pointers = || {
+                        curr_position = slice_end - 1;
                         legit_start = curr_position;
+                    };
+
+                    if slice_range.end > input.len() {
+                        update_pointers();
                         continue;
                     }
 
-                    let sub_str = &input[lit_range];
+                    let slice = &input[slice_range];
 
-                    let is_match = sub_str == *literal;
+                    let is_match = slice == *literal;
 
                     if is_match {
                         state += 1;
                         curr_position = literal.len() + curr_position;
                     } else {
-                        curr_position = lit_end_in_input - 1;
-                        legit_start = curr_position;
+                        update_pointers();
                         continue;
                     }
                 }
