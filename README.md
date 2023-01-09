@@ -17,21 +17,19 @@ sudo mv rn /usr/local/bin
 
 ## Usage
 
-Grab a binary (linux or mac) in [releases](https://github.com/Gnarus-G/rename/releases)
-
+Grab a binary (linux or mac) in [releases](https://github.com/Gnarus-G/rename/releases) or run the install script above.
 ```sh
 ./rn simple --help
 ```
-For example to replace `file1`, or `file99` to `1renamed.txt` or `99renamed.txt`, do:
+For example to replace `file1`, or `file99` to `1renamed.txt` or `99renamed.txt`
+### Experimental MRP (Match Replace Protocol)
 ```sh
-./rn simple "file(n:int)->(n)renamed.txt" file* --help
+./rn simple "file(n:int)->(n)renamed.txt" file*
 ```
-using the experimental match-replace-protocol (mrp).
-Or
+### Regular Expression
 ```sh
-./rn regex "file(\d+)" '${1}renamed.txt' file* --help
+./rn regex "file(\d+)" '${1}renamed.txt' file*
 ```
-using regular expressions.
 
 ## Demo
 ![simplescreenrecorder-2023-01-01_23 51 24](https://user-images.githubusercontent.com/37311893/210196100-96190c6e-9597-4755-a0a0-de86ca407d4a.gif)
