@@ -66,7 +66,18 @@ impl MatchExpression {
                     }
                 }
                 AbstractMatchingExpression::Capture { identifier, typing } => match typing {
-                    Token::DigitType => todo!(),
+                    Token::DigitType => {
+                        let ch = input.as_bytes()[curr_position] as char;
+
+                        if ch.is_ascii_digit() {
+                            curr_position += 1;
+                            state += 1;
+                            captures_map.insert(identifier.to_string(), ch.to_string());
+                        } else {
+                            curr_position += 1;
+                            state = 0;
+                        }
+                    }
                     Token::IntType => {
                         let ch = input.as_bytes()[curr_position] as char;
                         if let None = cap_start {
@@ -209,6 +220,29 @@ fn two_capture_groups() {
     assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
     assert_eq!(exp.get_capture("n").unwrap(), "321");
     assert_eq!(exp.get_capture("i").unwrap(), "78");
+}
+
+#[test]
+fn digit_capture_group() {
+    let exp = Parser::new(Lexer::new("digit(d:dig)"))
+        .parse_match_exp()
+        .unwrap();
+    let text = "aewrdigit276yoypa";
+
+    assert_eq!(exp.find_at(text, 0).unwrap().as_str(), "digit2");
+    assert_eq!(exp.get_capture("d").unwrap(), "2");
+}
+#[test]
+fn three_capture_groups() {
+    let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)ly(d:dig)"))
+        .parse_match_exp()
+        .unwrap();
+    let text = "ab321love78ly8";
+
+    assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
+    assert_eq!(exp.get_capture("n").unwrap(), "321");
+    assert_eq!(exp.get_capture("i").unwrap(), "78");
+    assert_eq!(exp.get_capture("d").unwrap(), "8");
 }
 
 #[test]
