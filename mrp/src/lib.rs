@@ -1,10 +1,7 @@
-#![feature(pattern)]
-
 mod error;
 mod lexer;
 mod matcher;
 pub mod parser;
-mod pattern;
 
 use std::{borrow::Cow, str::FromStr};
 
