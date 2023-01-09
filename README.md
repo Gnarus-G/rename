@@ -26,10 +26,13 @@ For example to replace `file1`, or `file99` to `1renamed.txt` or `99renamed.txt`
 ```sh
 ./rn simple "file(n:int)->(n)renamed.txt" file* --help
 ```
-or
+using the experimental match-replace-protocol (mrp).
+Or
 ```sh
 ./rn regex "file(\d+)" '${1}renamed.txt' file* --help
 ```
+using regular expressions.
+
 ## Demo
 ![simplescreenrecorder-2023-01-01_23 51 24](https://user-images.githubusercontent.com/37311893/210196100-96190c6e-9597-4755-a0a0-de86ca407d4a.gif)
 
