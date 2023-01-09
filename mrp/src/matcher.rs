@@ -164,94 +164,98 @@ impl<'t, 'm> Iterator for Matches<'t, 'm> {
 }
 
 #[cfg(test)]
-fn match_on(pattern: MatchExpression, input: &str) -> bool {
-    Matches::new(&pattern, input).count() > 0
-}
+mod tests {
+    use super::*;
 
-#[test]
-fn one() {
-    let exp = Parser::new(Lexer::new("abc")).parse_match_exp().unwrap();
-    assert_eq!(match_on(exp, "b"), false);
-}
+    fn match_on(pattern: MatchExpression, input: &str) -> bool {
+        Matches::new(&pattern, input).count() > 0
+    }
 
-#[test]
-fn two() {
-    let exp = Parser::new(Lexer::new("ab")).parse_match_exp().unwrap();
-    assert_eq!(match_on(exp, "abc"), true);
-}
+    #[test]
+    fn one() {
+        let exp = Parser::new(Lexer::new("abc")).parse_match_exp().unwrap();
+        assert_eq!(match_on(exp, "b"), false);
+    }
 
-#[test]
-fn three() {
-    let exp = Parser::new(Lexer::new("abc")).parse_match_exp().unwrap();
-    assert_eq!(match_on(exp, "abab5"), false);
-}
+    #[test]
+    fn two() {
+        let exp = Parser::new(Lexer::new("ab")).parse_match_exp().unwrap();
+        assert_eq!(match_on(exp, "abc"), true);
+    }
 
-#[test]
-fn four() {
-    let exp = Parser::new(Lexer::new("ab(n:int)"))
-        .parse_match_exp()
-        .unwrap();
-    assert_eq!(match_on(exp, "ab345"), true);
-}
+    #[test]
+    fn three() {
+        let exp = Parser::new(Lexer::new("abc")).parse_match_exp().unwrap();
+        assert_eq!(match_on(exp, "abab5"), false);
+    }
 
-#[test]
-fn sub_str_at_the_end() {
-    let exp = Parser::new(Lexer::new("ab(n:int)"))
-        .parse_match_exp()
-        .unwrap();
-    assert_eq!(match_on(exp, "helloab345"), true);
-}
+    #[test]
+    fn four() {
+        let exp = Parser::new(Lexer::new("ab(n:int)"))
+            .parse_match_exp()
+            .unwrap();
+        assert_eq!(match_on(exp, "ab345"), true);
+    }
 
-#[test]
-fn five() {
-    let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
-        .parse_match_exp()
-        .unwrap();
-    assert_eq!(match_on(exp, "abb"), false);
-}
+    #[test]
+    fn sub_str_at_the_end() {
+        let exp = Parser::new(Lexer::new("ab(n:int)"))
+            .parse_match_exp()
+            .unwrap();
+        assert_eq!(match_on(exp, "helloab345"), true);
+    }
 
-#[test]
-fn two_capture_groups() {
-    let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
-        .parse_match_exp()
-        .unwrap();
-    let text = "ab321love78";
+    #[test]
+    fn five() {
+        let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
+            .parse_match_exp()
+            .unwrap();
+        assert_eq!(match_on(exp, "abb"), false);
+    }
 
-    assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
-    assert_eq!(exp.get_capture("n").unwrap(), "321");
-    assert_eq!(exp.get_capture("i").unwrap(), "78");
-}
+    #[test]
+    fn two_capture_groups() {
+        let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
+            .parse_match_exp()
+            .unwrap();
+        let text = "ab321love78";
 
-#[test]
-fn digit_capture_group() {
-    let exp = Parser::new(Lexer::new("digit(d:dig)"))
-        .parse_match_exp()
-        .unwrap();
-    let text = "aewrdigit276yoypa";
+        assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
+        assert_eq!(exp.get_capture("n").unwrap(), "321");
+        assert_eq!(exp.get_capture("i").unwrap(), "78");
+    }
 
-    assert_eq!(exp.find_at(text, 0).unwrap().as_str(), "digit2");
-    assert_eq!(exp.get_capture("d").unwrap(), "2");
-}
-#[test]
-fn three_capture_groups() {
-    let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)ly(d:dig)"))
-        .parse_match_exp()
-        .unwrap();
-    let text = "ab321love78ly8";
+    #[test]
+    fn digit_capture_group() {
+        let exp = Parser::new(Lexer::new("digit(d:dig)"))
+            .parse_match_exp()
+            .unwrap();
+        let text = "aewrdigit276yoypa";
 
-    assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
-    assert_eq!(exp.get_capture("n").unwrap(), "321");
-    assert_eq!(exp.get_capture("i").unwrap(), "78");
-    assert_eq!(exp.get_capture("d").unwrap(), "8");
-}
+        assert_eq!(exp.find_at(text, 0).unwrap().as_str(), "digit2");
+        assert_eq!(exp.get_capture("d").unwrap(), "2");
+    }
+    #[test]
+    fn three_capture_groups() {
+        let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)ly(d:dig)"))
+            .parse_match_exp()
+            .unwrap();
+        let text = "ab321love78ly8";
 
-#[test]
-fn muliple_matches() {
-    let pattern = MatchExpression::from_str("xy(n:int)").unwrap();
-    let text = "wxy10xy33asdfxy81";
-    let mut matches = Matches::new(&pattern, text);
+        assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
+        assert_eq!(exp.get_capture("n").unwrap(), "321");
+        assert_eq!(exp.get_capture("i").unwrap(), "78");
+        assert_eq!(exp.get_capture("d").unwrap(), "8");
+    }
 
-    assert_eq!(matches.next().unwrap().as_str(), "xy10");
-    assert_eq!(matches.next().unwrap().as_str(), "xy33");
-    assert_eq!(matches.next().unwrap().as_str(), "xy81");
+    #[test]
+    fn muliple_matches() {
+        let pattern = MatchExpression::from_str("xy(n:int)").unwrap();
+        let text = "wxy10xy33asdfxy81";
+        let mut matches = Matches::new(&pattern, text);
+
+        assert_eq!(matches.next().unwrap().as_str(), "xy10");
+        assert_eq!(matches.next().unwrap().as_str(), "xy33");
+        assert_eq!(matches.next().unwrap().as_str(), "xy81");
+    }
 }
