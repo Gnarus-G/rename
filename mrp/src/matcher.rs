@@ -26,12 +26,12 @@ impl<'t> Match<'t> {
 }
 
 impl MatchExpression {
-    fn find_at<'t>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
+    pub fn find_at<'t>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
-        let mut cap_start = None;
-        let mut found_in_cap = None;
+        let mut capture_slice_start = None;
+        let mut capture_candidate_found = None;
 
         let mut captures_map = self.captures.borrow_mut();
 
@@ -44,7 +44,7 @@ impl MatchExpression {
                     let slice_range = curr_position..slice_end;
 
                     let mut update_pointers = || {
-                        curr_position = slice_end - 1;
+                        curr_position += 1;
                         legit_start = curr_position;
                     };
 
@@ -55,7 +55,7 @@ impl MatchExpression {
 
                     let slice = &input[slice_range];
 
-                    let is_match = slice == *literal;
+                    let is_match = slice == literal;
 
                     if is_match {
                         state += 1;
@@ -80,28 +80,34 @@ impl MatchExpression {
                     }
                     Token::IntType => {
                         let ch = input.as_bytes()[curr_position] as char;
-                        if let None = cap_start {
-                            cap_start = Some(curr_position);
-                        }
 
-                        let mut capture = |curr_position: usize| {
-                            state += 1;
+                        let mut capture = |start: usize, curr_position: usize| {
                             captures_map.insert(
                                 identifier.to_string(),
-                                input[cap_start.unwrap()..curr_position].to_string(),
+                                input[start..curr_position].to_string(),
                             );
-                            cap_start = None;
                         };
 
                         if ch.is_ascii_digit() {
-                            found_in_cap = Some(true);
+                            if let None = capture_slice_start {
+                                capture_slice_start = Some(curr_position);
+                                if state == 0 {
+                                    legit_start = curr_position;
+                                }
+                            }
+
+                            capture_candidate_found = Some(true);
                             curr_position += 1;
 
                             if curr_position == input.len() {
-                                capture(curr_position);
+                                state += 1;
+                                capture(capture_slice_start.unwrap(), curr_position);
+                                capture_slice_start = None;
                             }
-                        } else if found_in_cap.is_some() {
-                            capture(curr_position);
+                        } else if capture_candidate_found.is_some() {
+                            state += 1;
+                            capture(capture_slice_start.unwrap(), curr_position);
+                            capture_slice_start = None;
                         } else {
                             curr_position += 1;
                             state = 0;
@@ -122,6 +128,7 @@ impl MatchExpression {
 
         None
     }
+
     pub fn find_iter<'m, 't>(&'m self, text: &'t str) -> Matches<'t, 'm> {
         Matches::new(self, text)
     }
@@ -235,6 +242,7 @@ mod tests {
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), "digit2");
         assert_eq!(exp.get_capture("d").unwrap(), "2");
     }
+
     #[test]
     fn three_capture_groups() {
         let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)ly(d:dig)"))
@@ -246,6 +254,25 @@ mod tests {
         assert_eq!(exp.get_capture("n").unwrap(), "321");
         assert_eq!(exp.get_capture("i").unwrap(), "78");
         assert_eq!(exp.get_capture("d").unwrap(), "8");
+    }
+
+    #[test]
+    fn int_capture_group_at_the_begining() {
+        let exp = Parser::new(Lexer::new("(n:int)love(i:int)ly(d:dig)"))
+            .parse_match_exp()
+            .unwrap();
+        let text = "ab321love78ly8";
+
+        assert_eq!(exp.find_at(text, 0).unwrap().as_str(), &text[2..]);
+        assert_eq!(exp.get_capture("n").unwrap(), "321");
+        assert_eq!(exp.get_capture("i").unwrap(), "78");
+        assert_eq!(exp.get_capture("d").unwrap(), "8");
+    }
+
+    #[test]
+    fn special() {
+        let exp = MatchExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+        assert_eq!(exp.find_at("ashello090", 0).unwrap().as_str(), "hello0");
     }
 
     #[test]
