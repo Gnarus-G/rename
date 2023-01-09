@@ -2,16 +2,16 @@
 
 mod error;
 mod lexer;
+mod matcher;
 pub mod parser;
-mod pattern;
 
 use std::str::{
     pattern::{Pattern, SearchStep, Searcher},
     FromStr,
 };
 
+use matcher::Matches;
 use parser::MatchExpression;
-use pattern::Matches;
 
 pub struct MexSearcher<'t, 'm> {
     haystack: &'t str,
