@@ -1,5 +1,5 @@
 use clap::{Args, Parser, Subcommand};
-use mrp::parser::MatchAndReplaceExpression;
+use mrp::{DefaultMatchAndReplaceStrategy, MatchAndReplaceExpression, MatchAndReplaceStrategy};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
@@ -28,9 +28,9 @@ enum Command {
 fn main() {
     let base_args = RenameArgs::parse();
 
-    match &base_args.command {
-        Command::REGEX(args) => handle_regex_replacement(args, &base_args),
-        Command::SIMPLE(args) => handle_mrp_replacement(args, &base_args),
+    match base_args.command {
+        Command::REGEX(ref args) => handle_regex_replacement(&args, &base_args),
+        Command::SIMPLE(ref args) => handle_mrp_replacement(&args, &base_args),
     }
 }
 
@@ -44,36 +44,36 @@ struct SimpleArgs {
 }
 
 fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
-    let path_strs = base_args
-        .paths
-        .iter()
-        .filter_map(|p| {
-            let str = p.to_str();
-            if str.is_none() {
-                eprintln!("Path is invalid unicode: {:?}", p);
-            }
-            return str;
-        })
-        .collect();
+    let mut replace = DefaultMatchAndReplaceStrategy::new(&args.expression);
 
-    let replacements = args.expression.apply(path_strs, args.strip);
+    replace.set_strip(args.strip);
 
     base_args
         .paths
         .iter()
-        .zip(replacements)
+        .filter_map(|p| {
+            let str = p.to_str();
+
+            if str.is_none() {
+                eprintln!("Path is invalid unicode: {:?}", p);
+            }
+
+            return str;
+        })
+        .map(|p| (p, replace.apply(p)))
+        .filter_map(|(from, to)| to.map(|t| (from, t)))
         .for_each(|(from, to)| {
             if base_args.dry_run {
                 println!("Rename {:?} to {:?}", from, to);
             } else {
-                if let Err(err) = std::fs::rename(from, to) {
+                if let Err(err) = std::fs::rename(from, to.to_string()) {
                     eprintln!("{:?}: {}", from, err);
                 }
             }
         });
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Clone)]
 struct RegexArgs {
     /// The regex pattern with which to search.
     pattern: regex::Regex,
