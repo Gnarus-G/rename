@@ -41,7 +41,7 @@ pub struct ReplaceExpression {
     pub expressions: Vec<AbstractReplaceExpression>,
 }
 
-pub(crate) struct Parser<'a> {
+pub struct Parser<'a> {
     lexer: Lexer<'a>,
     token: Token,
     peek_token: Token,

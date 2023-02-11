@@ -14,3 +14,7 @@ criterion = "0.4"
 [[bench]]
 name = "mrp_vs_regex"
 harness = false
+
+[[bench]]
+name = "parsing"
+harness = false
