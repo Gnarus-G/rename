@@ -16,7 +16,7 @@ fn regex_benchmark(c: &mut Criterion) {
 }
 
 fn regex_transpl_benchmark(c: &mut Criterion) {
-    let exp = MatchAndReplaceExpression::from_str(EXP).unwrap();
+    let exp = MatchAndReplaceExpression::from(EXP).unwrap();
     let r = RegexTranspilationStrategy::new(&exp);
     c.bench_function("regex transpile strat", |b| {
         b.iter(|| {
@@ -26,7 +26,7 @@ fn regex_transpl_benchmark(c: &mut Criterion) {
 }
 
 fn mrp_benchmark(c: &mut Criterion) {
-    let exp = MatchAndReplaceExpression::from_str(EXP).unwrap();
+    let exp = MatchAndReplaceExpression::from(EXP).unwrap();
     let r = DefaultMatchAndReplaceStrategy::new(&exp);
     c.bench_function("mrp strat", |b| {
         b.iter(|| {

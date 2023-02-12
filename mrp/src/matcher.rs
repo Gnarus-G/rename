@@ -2,11 +2,11 @@ use crate::lexer::Token;
 use crate::parser::{AbstractMatchingExpression, MatchExpression};
 
 #[cfg(test)]
-impl std::str::FromStr for MatchExpression {
-    type Err = crate::error::ParseError;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        crate::parser::Parser::new(crate::lexer::Lexer::new(s)).parse_match_exp()
+impl<'s> From<&'s str> for MatchExpression<'s> {
+    fn from(s: &'s str) -> Self {
+        crate::parser::Parser::new(crate::lexer::Lexer::new(s))
+            .parse_match_exp()
+            .unwrap()
     }
 }
 
@@ -22,7 +22,7 @@ impl<'t> Match<'t> {
     }
 }
 
-impl MatchExpression {
+impl<'s> MatchExpression<'s> {
     /// Find the leftmost-first match in the input starting at the given position
     pub fn find_at<'t>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
         let mut curr_position = start;
@@ -135,7 +135,7 @@ impl MatchExpression {
 #[derive(Debug)]
 pub struct Matches<'t, 'm> {
     pub(crate) text: &'t str,
-    pub(crate) mex: &'m MatchExpression,
+    pub(crate) mex: &'m MatchExpression<'m>,
     last_end: usize,
 }
 
@@ -170,7 +170,6 @@ impl<'t, 'm> Iterator for Matches<'t, 'm> {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
 
     use crate::{lexer::Lexer, parser::Parser};
 
@@ -273,13 +272,13 @@ mod tests {
 
     #[test]
     fn special() {
-        let exp = MatchExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+        let exp = MatchExpression::from("hello(as:dig)->oh(as)hi");
         assert_eq!(exp.find_at("ashello090", 0).unwrap().as_str(), "hello0");
     }
 
     #[test]
     fn muliple_matches() {
-        let pattern = MatchExpression::from_str("xy(n:int)").unwrap();
+        let pattern = MatchExpression::from("xy(n:int)");
         let text = "wxy10xy33asdfxy81";
         let mut matches = Matches::new(&pattern, text);
 

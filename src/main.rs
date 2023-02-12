@@ -37,14 +37,15 @@ fn main() {
 #[derive(Debug, Args)]
 struct SimpleArgs {
     /// A Match & Replace expression in the custom MRP syntax.
-    expression: MatchAndReplaceExpression,
+    expression: String,
     /// Strip off anything not explicitly matched for while replacting.
     #[clap(short, long)]
     strip: bool,
 }
 
 fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
-    let mut replace = DefaultMatchAndReplaceStrategy::new(&args.expression);
+    let exp = MatchAndReplaceExpression::from(args.expression.as_str());
+    let mut replace = DefaultMatchAndReplaceStrategy::new(&exp);
 
     replace.set_strip(args.strip);
 

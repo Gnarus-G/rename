@@ -6,25 +6,28 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq)]
-pub enum AbstractMatchingExpression {
+pub enum AbstractMatchingExpression<'t> {
     Literal(String),
-    Capture { identifier: Token, typing: Token },
+    Capture {
+        identifier: Token<'t>,
+        typing: Token<'t>,
+    },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum AbstractReplaceExpression {
+pub enum AbstractReplaceExpression<'s> {
     Literal(String),
-    Identifier(String),
+    Identifier(&'s str),
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MatchExpression {
-    pub expressions: Vec<AbstractMatchingExpression>,
+pub struct MatchExpression<'s> {
+    pub expressions: Vec<AbstractMatchingExpression<'s>>,
     pub captures: RefCell<HashMap<String, String>>,
 }
 
-impl MatchExpression {
-    pub fn new(expressions: Vec<AbstractMatchingExpression>) -> Self {
+impl<'s> MatchExpression<'s> {
+    pub fn new(expressions: Vec<AbstractMatchingExpression<'s>>) -> Self {
         Self {
             expressions,
             captures: RefCell::new(HashMap::new()),
@@ -37,18 +40,18 @@ impl MatchExpression {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ReplaceExpression {
-    pub expressions: Vec<AbstractReplaceExpression>,
+pub struct ReplaceExpression<'a> {
+    pub expressions: Vec<AbstractReplaceExpression<'a>>,
 }
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
-    token: Token,
-    peek_token: Token,
+    token: Token<'a>,
+    peek_token: Token<'a>,
 }
 
-impl<'l> Parser<'l> {
-    pub fn new(lexer: Lexer<'l>) -> Self {
+impl<'a> Parser<'a> {
+    pub fn new(lexer: Lexer<'a>) -> Self {
         let mut p = Self {
             lexer,
             token: Token::End,
@@ -64,14 +67,12 @@ impl<'l> Parser<'l> {
         self.peek_token = self.lexer.next();
     }
 
-    pub fn parse_match_exp(&mut self) -> Result<MatchExpression> {
+    pub fn parse_match_exp(&mut self) -> Result<'a, MatchExpression<'a>> {
         let mut expressions = vec![];
 
         while self.token != Token::End {
-            let exp = match &self.token {
-                Token::Literal(l) => {
-                    AbstractMatchingExpression::Literal(self.parse_literal(l.clone()))
-                }
+            let exp = match self.token {
+                Token::Literal(l) => AbstractMatchingExpression::Literal(self.parse_literal(l)),
                 Token::Ident(i) => self.parse_capture(i.clone())?,
                 Token::Arrow => {
                     self.advance();
@@ -100,7 +101,7 @@ impl<'l> Parser<'l> {
         lit
     }
 
-    fn parse_capture(&mut self, identifier: String) -> Result<AbstractMatchingExpression> {
+    fn parse_capture(&mut self, identifier: &'a str) -> Result<'a, AbstractMatchingExpression<'a>> {
         self.advance();
 
         self.expect(Token::DigitType)
@@ -113,7 +114,7 @@ impl<'l> Parser<'l> {
         })
     }
 
-    fn expect(&mut self, token: Token) -> Result<()> {
+    fn expect(&mut self, token: Token<'a>) -> Result<'a, ()> {
         if self.peek_token != token {
             return Err(ParseError::ExpectedToken {
                 expected: token,
@@ -125,14 +126,12 @@ impl<'l> Parser<'l> {
         Ok(())
     }
 
-    pub fn parse_replacement_exp(&mut self) -> Result<ReplaceExpression> {
+    pub fn parse_replacement_exp(&mut self) -> Result<ReplaceExpression<'a>> {
         let mut expressions = vec![];
 
         while self.token != Token::End {
             let exp = match &self.token {
-                Token::Literal(l) => {
-                    AbstractReplaceExpression::Literal(self.parse_literal(l.clone()))
-                }
+                Token::Literal(l) => AbstractReplaceExpression::Literal(self.parse_literal(*l)),
                 Token::Ident(i) => AbstractReplaceExpression::Identifier(i.clone()),
                 _ => {
                     self.advance();
@@ -183,7 +182,7 @@ mod tests {
         assert_eq!(
             p.parse_match_exp().unwrap(),
             MatchExpression::new(vec![AbstractMatchingExpression::Capture {
-                identifier: Token::Ident("num".to_string()),
+                identifier: Token::Ident("num"),
 
                 typing: Token::IntType
             }])
@@ -200,7 +199,7 @@ mod tests {
             MatchExpression::new(vec![
                 AbstractMatchingExpression::Literal("abc".to_string()),
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("d".to_string()),
+                    identifier: Token::Ident("d"),
 
                     typing: Token::DigitType
                 }
@@ -218,18 +217,18 @@ mod tests {
             MatchExpression::new(vec![
                 AbstractMatchingExpression::Literal("abc235".to_string()),
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("d".to_string()),
+                    identifier: Token::Ident("d"),
 
                     typing: Token::DigitType
                 },
                 AbstractMatchingExpression::Literal("zap".to_string()),
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("num".to_string()),
+                    identifier: Token::Ident("num"),
 
                     typing: Token::IntType
                 },
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("d".to_string()),
+                    identifier: Token::Ident("d"),
 
                     typing: Token::IntType
                 },
@@ -259,7 +258,7 @@ mod tests {
             p.parse_match_exp().unwrap(),
             MatchExpression::new(vec![
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("num".to_string()),
+                    identifier: Token::Ident("num"),
 
                     typing: Token::IntType
                 },
@@ -272,7 +271,7 @@ mod tests {
             ReplaceExpression {
                 expressions: vec![
                     AbstractReplaceExpression::Literal("lul".to_string()),
-                    AbstractReplaceExpression::Identifier("num".to_string())
+                    AbstractReplaceExpression::Identifier("num")
                 ]
             }
         )
