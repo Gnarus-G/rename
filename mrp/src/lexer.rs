@@ -43,22 +43,25 @@ pub struct Token<'t> {
 
 #[derive(Debug)]
 pub struct Lexer<'a> {
-    input: &'a str,
+    input: &'a [u8],
     position: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
-        Self { input, position: 0 }
+        Self {
+            input: input.as_bytes(),
+            position: 0,
+        }
     }
 
-    pub fn input_slice(&self, range: Range<usize>) -> &str {
-        &self.input[range]
+    fn input_slice(&self, range: Range<usize>) -> &'a str {
+        std::str::from_utf8(&self.input[range]).expect("input to only contain utf-8 characters")
     }
 
     fn char_at(&self, position: usize) -> Option<&u8> {
         if position < self.input.len() {
-            return Some(&self.input.as_bytes()[position]);
+            return Some(&self.input[position]);
         }
         return None;
     }
@@ -137,7 +140,7 @@ impl<'a> Lexer<'a> {
     fn type_token(&mut self) -> Token<'a> {
         let start = self.position;
         let (s, e) = self.read_while(|c| c.is_ascii_alphabetic());
-        let slice = &self.input[s..e];
+        let slice = self.input_slice(s..e);
         let kind = match slice {
             "dig" => TokenKind::DigitType,
             "int" => TokenKind::IntType,
@@ -153,7 +156,7 @@ impl<'a> Lexer<'a> {
     fn identifier_token(&mut self) -> Token<'a> {
         let start = self.position;
         let (s, e) = self.read_while(|c| c.is_ascii_alphabetic());
-        let slice = &self.input[s..e];
+        let slice = self.input_slice(s..e);
 
         Token {
             kind: TokenKind::Ident,
@@ -168,10 +171,9 @@ impl<'a> Lexer<'a> {
             b'(' | b')' | b':' | b'-' => false,
             _ => true,
         });
-        let slice = &self.input[s..e];
         Token {
             kind: TokenKind::Literal,
-            text: TokenText::Slice(slice),
+            text: TokenText::Slice(self.input_slice(s..e)),
             start,
         }
     }
