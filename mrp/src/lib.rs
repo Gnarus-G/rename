@@ -1,5 +1,5 @@
 mod error;
-mod lexer;
+pub mod lexer;
 mod matcher;
 pub mod parser;
 
@@ -19,25 +19,23 @@ pub trait MatchAndReplaceStrategy {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MatchAndReplaceExpression {
-    mex: MatchExpression,
-    rex: ReplaceExpression,
+pub struct MatchAndReplaceExpression<'a> {
+    mex: MatchExpression<'a>,
+    rex: ReplaceExpression<'a>,
 }
 
-impl FromStr for MatchAndReplaceExpression {
-    type Err = ParseError;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let mut p = Parser::new(Lexer::new(s));
-        Ok(MatchAndReplaceExpression {
-            mex: p.parse_match_exp()?,
-            rex: p.parse_replacement_exp()?,
-        })
+impl<'a> From<&'a str> for MatchAndReplaceExpression<'a> {
+    fn from(value: &'a str) -> Self {
+        let mut p = Parser::new(Lexer::new(value));
+        MatchAndReplaceExpression {
+            mex: p.parse_match_exp().unwrap(),
+            rex: p.parse_replacement_exp().unwrap(),
+        }
     }
 }
 
 pub struct DefaultMatchAndReplaceStrategy<'m> {
-    mrex: &'m MatchAndReplaceExpression,
+    mrex: &'m MatchAndReplaceExpression<'m>,
     /// When true, this strategy will replace the matching range found, and strip everything else
     /// off.
     strip: bool,
@@ -161,7 +159,7 @@ mod tests {
     #[test]
     fn one_literal_and_int_capture() {
         let input = "lit(num:int)->lul(num)";
-        let expression = MatchAndReplaceExpression::from_str(input).unwrap();
+        let expression = MatchAndReplaceExpression::from(input);
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         assert_eq!(strat.apply("lit12").unwrap(), "lul12");
@@ -170,14 +168,14 @@ mod tests {
     #[test]
     fn test_mrp_application() {
         let input = "(num:int)asdf->lul(num)";
-        let expression = MatchAndReplaceExpression::from_str(input).unwrap();
+        let expression = MatchAndReplaceExpression::from(input);
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         let treated = strat.apply_all(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
 
         assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
 
-        let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+        let expression = MatchAndReplaceExpression::from("hello(as:dig)->oh(as)hi");
 
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
@@ -188,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_mrp_application_stripping() {
-        let expression = MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+        let expression = MatchAndReplaceExpression::from("hello(as:dig)->oh(as)hi");
         let mut strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         strat.set_strip(true);
@@ -200,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_mrp_application_with_multi_digits_and_stripping() {
-        let expression = MatchAndReplaceExpression::from_str("(n:int)->step(n)").unwrap();
+        let expression = MatchAndReplaceExpression::from("(n:int)->step(n)");
         let mut strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         strat.set_strip(true);
@@ -225,16 +223,14 @@ mod tests {
         #[test]
         fn test_mrp_application() {
             let input = "(num:int)asdf->lul(num)";
-            let expression = RegexTranspilationStrategy::new(
-                &MatchAndReplaceExpression::from_str(input).unwrap(),
-            );
+            let expression =
+                RegexTranspilationStrategy::new(&MatchAndReplaceExpression::from(input));
 
             let treated = expression.apply_all(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
 
             assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
 
-            let expression =
-                MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+            let expression = MatchAndReplaceExpression::from("hello(as:dig)->oh(as)hi");
 
             let strat = RegexTranspilationStrategy::new(&expression);
 
@@ -245,8 +241,7 @@ mod tests {
 
         #[test]
         fn test_mrp_application_stripping() {
-            let expression =
-                MatchAndReplaceExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
+            let expression = MatchAndReplaceExpression::from("hello(as:dig)->oh(as)hi");
             let mut strat = RegexTranspilationStrategy::new(&expression);
 
             strat.make_pattern_strip_non_matched_parts();
@@ -258,7 +253,7 @@ mod tests {
 
         #[test]
         fn test_mrp_application_with_multi_digits_and_stripping() {
-            let expression = MatchAndReplaceExpression::from_str("(n:int)->step(n)").unwrap();
+            let expression = MatchAndReplaceExpression::from("(n:int)->step(n)");
             let mut strat = RegexTranspilationStrategy::new(&expression);
 
             strat.make_pattern_strip_non_matched_parts();

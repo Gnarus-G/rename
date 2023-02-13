@@ -1,16 +1,19 @@
 use crate::lexer::Token;
 
-pub type Result<'s, T> = std::result::Result<T, ParseError>;
+pub type Result<'s, T> = std::result::Result<T, ParseError<'s>>;
 
 #[derive(Debug, PartialEq)]
-pub enum ParseError {
-    ExpectedToken { expected: Token, found: Token },
-    UnsupportedToken(Token),
+pub enum ParseError<'t> {
+    ExpectedToken {
+        expected: Token<'t>,
+        found: Token<'t>,
+    },
+    UnsupportedToken(Token<'t>),
 }
 
-impl std::error::Error for ParseError {}
+impl<'t> std::error::Error for ParseError<'t> {}
 
-impl std::fmt::Display for ParseError {
+impl<'t> std::fmt::Display for ParseError<'t> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
             Self::ExpectedToken { expected, found } => {

@@ -1,19 +1,19 @@
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token {
+pub enum Token<'s> {
     Literal(char),
     Lparen,
     Rparen,
     DigitType,
     IntType,
-    Ident(String),
+    Ident(&'s str),
     Colon,
     Arrow,
     End,
 }
 
-impl Display for Token {
+impl<'s> Display for Token<'s> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         return match self {
             Token::Literal(l) => write!(f, "{l}"),
@@ -77,7 +77,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn read_while<P: Fn(&char) -> bool>(&mut self, predicate: P) -> &str {
+    fn read_while<P: Fn(&char) -> bool>(&mut self, predicate: P) -> &'a str {
         let start_pos = self.position;
 
         while predicate(&self.ch) {
@@ -87,7 +87,7 @@ impl<'a> Lexer<'a> {
         return &self.input[start_pos..self.position];
     }
 
-    pub fn next(&mut self) -> Token {
+    pub fn next(&mut self) -> Token<'a> {
         let t = match self.ch {
             '(' => Token::Lparen,
             ':' => Token::Colon,
@@ -102,7 +102,7 @@ impl<'a> Lexer<'a> {
                 return match str {
                     "dig" => Token::DigitType,
                     "int" => Token::IntType,
-                    str => Token::Ident(str.to_string()),
+                    str => Token::Ident(str),
                 };
             }
             c => Token::Literal(c),
@@ -145,7 +145,7 @@ mod tests {
         assert_eq!(l.next(), Token::Literal('a'));
         assert_eq!(l.next(), Token::Literal('5'));
         assert_eq!(l.next(), Token::Lparen);
-        assert_eq!(l.next(), Token::Ident("d".to_string()));
+        assert_eq!(l.next(), Token::Ident("d"));
         assert_eq!(l.next(), Token::Colon);
         assert_eq!(l.next(), Token::DigitType);
         assert_eq!(l.next(), Token::Rparen);
@@ -156,7 +156,7 @@ mod tests {
         let mut l = Lexer::new("z(i:int)");
         assert_eq!(l.next(), Token::Literal('z'));
         assert_eq!(l.next(), Token::Lparen);
-        assert_eq!(l.next(), Token::Ident("i".to_string()));
+        assert_eq!(l.next(), Token::Ident("i"));
         assert_eq!(l.next(), Token::Colon);
         assert_eq!(l.next(), Token::IntType);
         assert_eq!(l.next(), Token::Rparen);
@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(l.next(), Token::Literal('1'));
         assert_eq!(l.next(), Token::Literal('0'));
         assert_eq!(l.next(), Token::Lparen);
-        assert_eq!(l.next(), Token::Ident("x".to_string()));
+        assert_eq!(l.next(), Token::Ident("x"));
         assert_eq!(l.next(), Token::Colon);
         assert_eq!(l.next(), Token::DigitType);
         assert_eq!(l.next(), Token::Rparen);
@@ -182,7 +182,7 @@ mod tests {
         assert_eq!(l.next(), Token::Literal('a'));
         assert_eq!(l.next(), Token::Literal('p'));
         assert_eq!(l.next(), Token::Lparen);
-        assert_eq!(l.next(), Token::Ident("i".to_string()));
+        assert_eq!(l.next(), Token::Ident("i"));
         assert_eq!(l.next(), Token::Colon);
         assert_eq!(l.next(), Token::IntType);
         assert_eq!(l.next(), Token::Rparen);
@@ -194,13 +194,13 @@ mod tests {
         assert_eq!(l.next(), Token::Literal('a'));
         assert_eq!(l.next(), Token::Literal('5'));
         assert_eq!(l.next(), Token::Lparen);
-        assert_eq!(l.next(), Token::Ident("d".to_string()));
+        assert_eq!(l.next(), Token::Ident("d"));
         assert_eq!(l.next(), Token::Colon);
         assert_eq!(l.next(), Token::DigitType);
         assert_eq!(l.next(), Token::Rparen);
 
         assert_eq!(l.next(), Token::Lparen);
-        assert_eq!(l.next(), Token::Ident("num".to_string()));
+        assert_eq!(l.next(), Token::Ident("num"));
         assert_eq!(l.next(), Token::Colon);
         assert_eq!(l.next(), Token::IntType);
         assert_eq!(l.next(), Token::Rparen);
@@ -211,13 +211,13 @@ mod tests {
         let mut l = Lexer::new("a(n:dig)->(n)b");
         assert_eq!(l.next(), Token::Literal('a'));
         assert_eq!(l.next(), Token::Lparen);
-        assert_eq!(l.next(), Token::Ident("n".to_string()));
+        assert_eq!(l.next(), Token::Ident("n"));
         assert_eq!(l.next(), Token::Colon);
         assert_eq!(l.next(), Token::DigitType);
         assert_eq!(l.next(), Token::Rparen);
         assert_eq!(l.next(), Token::Arrow);
         assert_eq!(l.next(), Token::Lparen);
-        assert_eq!(l.next(), Token::Ident("n".to_string()));
+        assert_eq!(l.next(), Token::Ident("n"));
         assert_eq!(l.next(), Token::Rparen);
         assert_eq!(l.next(), Token::Literal('b'));
     }
