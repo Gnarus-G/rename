@@ -1,11 +1,11 @@
-use crate::lexer::Token;
+use crate::lexer::{Token, TokenKind};
 
 pub type Result<'s, T> = std::result::Result<T, ParseError<'s>>;
 
 #[derive(Debug, PartialEq)]
 pub enum ParseError<'t> {
     ExpectedToken {
-        expected: Token<'t>,
+        expected: TokenKind,
         found: Token<'t>,
     },
     UnsupportedToken(Token<'t>),

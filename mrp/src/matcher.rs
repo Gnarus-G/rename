@@ -1,8 +1,8 @@
-use crate::lexer::Token;
-use crate::parser::{AbstractMatchingExpression, MatchExpression};
+use crate::lexer::{Token, TokenKind};
+use crate::parser::{AbstractMatchingExpression, CaptureType, MatchExpression};
 
 #[cfg(test)]
-impl<'s> From<&'s str> for MatchExpression<'s> {
+impl<'s> From<&'s str> for MatchExpression {
     fn from(s: &'s str) -> Self {
         crate::parser::Parser::new(crate::lexer::Lexer::new(s))
             .parse_match_exp()
@@ -22,7 +22,7 @@ impl<'t> Match<'t> {
     }
 }
 
-impl<'s> MatchExpression<'s> {
+impl MatchExpression {
     /// Find the leftmost-first match in the input starting at the given position
     pub fn find_at<'t>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
         let mut curr_position = start;
@@ -63,8 +63,11 @@ impl<'s> MatchExpression<'s> {
                         continue;
                     }
                 }
-                AbstractMatchingExpression::Capture { identifier, typing } => match typing {
-                    Token::DigitType => {
+                AbstractMatchingExpression::Capture {
+                    identifier,
+                    identifier_type,
+                } => match identifier_type {
+                    CaptureType::Digit => {
                         let ch = input.as_bytes()[curr_position] as char;
 
                         if ch.is_ascii_digit() {
@@ -76,14 +79,16 @@ impl<'s> MatchExpression<'s> {
                             state = 0;
                         }
                     }
-                    Token::IntType => {
+                    CaptureType::Int => {
                         let ch = input.as_bytes()[curr_position] as char;
 
+                        dbg!(&identifier);
                         let mut capture = |start: usize, curr_position: usize| {
                             captures_map.insert(
                                 identifier.to_string(),
                                 input[start..curr_position].to_string(),
                             );
+                            dbg!(&captures_map);
                         };
 
                         if ch.is_ascii_digit() {
@@ -111,7 +116,7 @@ impl<'s> MatchExpression<'s> {
                             state = 0;
                         }
                     }
-                    t => panic!("{t} is an invalid capture type"),
+                    t => panic!("{:?} is an invalid capture type", t),
                 },
             }
         }
@@ -135,7 +140,7 @@ impl<'s> MatchExpression<'s> {
 #[derive(Debug)]
 pub struct Matches<'t, 'm> {
     pub(crate) text: &'t str,
-    pub(crate) mex: &'m MatchExpression<'m>,
+    pub(crate) mex: &'m MatchExpression,
     last_end: usize,
 }
 

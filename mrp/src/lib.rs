@@ -3,10 +3,9 @@ pub mod lexer;
 mod matcher;
 pub mod parser;
 
-use std::{borrow::Cow, str::FromStr};
+use std::borrow::Cow;
 
-use error::ParseError;
-use lexer::{Lexer, Token};
+use lexer::Lexer;
 use parser::{
     AbstractMatchingExpression, AbstractReplaceExpression, MatchExpression, Parser,
     ReplaceExpression,
@@ -19,12 +18,12 @@ pub trait MatchAndReplaceStrategy {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MatchAndReplaceExpression<'a> {
-    mex: MatchExpression<'a>,
-    rex: ReplaceExpression<'a>,
+pub struct MatchAndReplaceExpression {
+    mex: MatchExpression,
+    rex: ReplaceExpression,
 }
 
-impl<'a> From<&'a str> for MatchAndReplaceExpression<'a> {
+impl<'a> From<&'a str> for MatchAndReplaceExpression {
     fn from(value: &'a str) -> Self {
         let mut p = Parser::new(Lexer::new(value));
         MatchAndReplaceExpression {
@@ -35,7 +34,7 @@ impl<'a> From<&'a str> for MatchAndReplaceExpression<'a> {
 }
 
 pub struct DefaultMatchAndReplaceStrategy<'m> {
-    mrex: &'m MatchAndReplaceExpression<'m>,
+    mrex: &'m MatchAndReplaceExpression,
     /// When true, this strategy will replace the matching range found, and strip everything else
     /// off.
     strip: bool,
@@ -68,7 +67,7 @@ impl<'m> MatchAndReplaceStrategy for DefaultMatchAndReplaceStrategy<'m> {
                             .mrex
                             .mex
                             .get_capture(i)
-                            .expect("should have been captured"),
+                            .expect(&format!("'{i}' should have been captured")),
                     })
                     .collect();
 
@@ -98,16 +97,14 @@ impl RegexTranspilationStrategy {
             .iter()
             .filter_map(|e| match e {
                 AbstractMatchingExpression::Literal(l) => Some(l.clone()),
-                AbstractMatchingExpression::Capture { identifier, typing } => {
-                    if let Token::Ident(id) = identifier {
-                        return match typing {
-                            Token::DigitType => Some(format!("(?P<{id}>\\d)")),
-                            Token::IntType => Some(format!("(?P<{id}>\\d+)")),
-                            _ => None,
-                        };
+                AbstractMatchingExpression::Capture {
+                    identifier,
+                    identifier_type,
+                } => {
+                    return match identifier_type {
+                        parser::CaptureType::Digit => Some(format!("(?P<{}>\\d)", identifier)),
+                        parser::CaptureType::Int => Some(format!("(?P<{}>\\d+)", identifier)),
                     };
-
-                    None
                 }
             })
             .collect();
