@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use mrp::{
-    lexer::{Lexer, Token},
+    lexer::{Lexer, TokenKind},
     parser::Parser,
 };
 
@@ -10,9 +10,9 @@ fn lexing_benchmark(c: &mut Criterion) {
     let mut lexer = Lexer::new(EXPRESSION);
     c.bench_function("lexing", |b| {
         b.iter(|| {
-            let mut t = lexer.next();
-            while t != Token::End {
-                t = lexer.next();
+            let mut t = lexer.next_token();
+            while t.kind != TokenKind::End {
+                t = lexer.next_token();
             }
         })
     });
