@@ -163,132 +163,135 @@ impl<'a> Parser<'a> {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//
-//     use super::*;
-//
-//     #[test]
-//     fn test_literal_expression() {
-//         let input = "abc";
-//         let mut p = Parser::new(Lexer::new(input));
-//
-//         assert_eq!(
-//             p.parse_match_exp().unwrap(),
-//             MatchExpression::new(vec![AbstractMatchingExpression::Literal("abc".to_string())])
-//         );
-//
-//         let input = "1234";
-//         let mut p = Parser::new(Lexer::new(input));
-//
-//         assert_eq!(
-//             p.parse_match_exp().unwrap(),
-//             MatchExpression::new(vec![AbstractMatchingExpression::Literal(
-//                 "1234".to_string()
-//             )],)
-//         )
-//     }
-//
-//     #[test]
-//     fn test_capture_expression() {
-//         let input = "(num:int)";
-//         let mut p = Parser::new(Lexer::new(input));
-//
-//         assert_eq!(
-//             p.parse_match_exp().unwrap(),
-//             MatchExpression::new(vec![AbstractMatchingExpression::Capture {
-//                 identifier: Token::Ident("num"),
-//
-//                 typing: Token::IntType
-//             }])
-//         );
-//     }
-//
-//     #[test]
-//     fn test_simple_match_expression() {
-//         let input = "abc(d:dig)";
-//         let mut p = Parser::new(Lexer::new(input));
-//
-//         assert_eq!(
-//             p.parse_match_exp().unwrap(),
-//             MatchExpression::new(vec![
-//                 AbstractMatchingExpression::Literal("abc".to_string()),
-//                 AbstractMatchingExpression::Capture {
-//                     identifier: Token::Ident("d"),
-//
-//                     typing: Token::DigitType
-//                 }
-//             ])
-//         )
-//     }
-//
-//     #[test]
-//     fn test_multiple_captures_in_match_expression() {
-//         let input = "abc235(d:dig)zap(num:int)(d:int)";
-//         let mut p = Parser::new(Lexer::new(input));
-//
-//         assert_eq!(
-//             p.parse_match_exp().unwrap(),
-//             MatchExpression::new(vec![
-//                 AbstractMatchingExpression::Literal("abc235".to_string()),
-//                 AbstractMatchingExpression::Capture {
-//                     identifier: Token::Ident("d"),
-//
-//                     typing: Token::DigitType
-//                 },
-//                 AbstractMatchingExpression::Literal("zap".to_string()),
-//                 AbstractMatchingExpression::Capture {
-//                     identifier: Token::Ident("num"),
-//
-//                     typing: Token::IntType
-//                 },
-//                 AbstractMatchingExpression::Capture {
-//                     identifier: Token::Ident("d"),
-//
-//                     typing: Token::IntType
-//                 },
-//             ])
-//         )
-//     }
-//
-//     #[test]
-//     fn test_wrong_capture_syntax() {
-//         let input = "(ident:)";
-//         let mut p = Parser::new(Lexer::new(input));
-//         assert_eq!(
-//             p.parse_match_exp().unwrap_err(),
-//             ParseError::ExpectedToken {
-//                 expected: Token::IntType,
-//                 found: Token::Rparen
-//             }
-//         );
-//     }
-//
-//     #[test]
-//     fn test_simple_match_and_replace_expression() {
-//         let input = "(num:int)asdf->lul(num)";
-//         let mut p = Parser::new(Lexer::new(input));
-//
-//         assert_eq!(
-//             p.parse_match_exp().unwrap(),
-//             MatchExpression::new(vec![
-//                 AbstractMatchingExpression::Capture {
-//                     identifier: Token::Ident("num"),
-//
-//                     typing: Token::IntType
-//                 },
-//                 AbstractMatchingExpression::Literal("asdf".to_string()),
-//             ])
-//         );
-//
-//         assert_eq!(
-//             p.parse_replacement_exp().unwrap(),
-//             ReplaceExpression {
-//                 expressions: vec![
-//                     AbstractReplaceExpression::Literal("lul".to_string()),
-//                     AbstractReplaceExpression::Identifier("num")
-//                 ]
-//             }
-//         )
-//     }
-// }
+#[cfg(test)]
+mod tests {
+
+    use crate::lexer::TokenText;
+
+    use super::*;
+
+    #[test]
+    fn test_literal_expression() {
+        let input = "abc";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp().unwrap(),
+            MatchExpression::new(vec![AbstractMatchingExpression::Literal("abc".to_string())])
+        );
+
+        let input = "1234";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp().unwrap(),
+            MatchExpression::new(vec![AbstractMatchingExpression::Literal(
+                "1234".to_string()
+            )],)
+        )
+    }
+
+    #[test]
+    fn test_capture_expression() {
+        let input = "(num:int)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp().unwrap(),
+            MatchExpression::new(vec![AbstractMatchingExpression::Capture {
+                identifier: "num".to_string(),
+                identifier_type: CaptureType::Int
+            }])
+        );
+    }
+
+    #[test]
+    fn test_simple_match_expression() {
+        let input = "abc(d:dig)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp().unwrap(),
+            MatchExpression::new(vec![
+                AbstractMatchingExpression::Literal("abc".to_string()),
+                AbstractMatchingExpression::Capture {
+                    identifier: "d".to_string(),
+                    identifier_type: CaptureType::Digit
+                }
+            ])
+        )
+    }
+
+    #[test]
+    fn test_multiple_captures_in_match_expression() {
+        let input = "abc235(d:dig)zap(num:int)(d:int)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp().unwrap(),
+            MatchExpression::new(vec![
+                AbstractMatchingExpression::Literal("abc235".to_string()),
+                AbstractMatchingExpression::Capture {
+                    identifier: ("d".to_string()),
+
+                    identifier_type: CaptureType::Digit
+                },
+                AbstractMatchingExpression::Literal("zap".to_string()),
+                AbstractMatchingExpression::Capture {
+                    identifier: ("num".to_string()),
+
+                    identifier_type: CaptureType::Int
+                },
+                AbstractMatchingExpression::Capture {
+                    identifier: ("d".to_string()),
+
+                    identifier_type: CaptureType::Int
+                },
+            ])
+        )
+    }
+
+    #[test]
+    fn test_wrong_capture_syntax() {
+        let input = "(ident:)";
+        let mut p = Parser::new(Lexer::new(input));
+        assert_eq!(
+            p.parse_match_exp().unwrap_err(),
+            ParseError::ExpectedToken {
+                expected: TokenKind::IntType,
+                found: Token {
+                    kind: TokenKind::Rparen,
+                    text: TokenText::Empty,
+                    start: 7
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_simple_match_and_replace_expression() {
+        let input = "(num:int)asdf->lul(num)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp().unwrap(),
+            MatchExpression::new(vec![
+                AbstractMatchingExpression::Capture {
+                    identifier: "num".to_string(),
+                    identifier_type: CaptureType::Int
+                },
+                AbstractMatchingExpression::Literal("asdf".to_string()),
+            ])
+        );
+
+        assert_eq!(
+            p.parse_replacement_exp().unwrap(),
+            ReplaceExpression {
+                expressions: vec![
+                    AbstractReplaceExpression::Literal("lul".to_string()),
+                    AbstractReplaceExpression::Identifier("num".to_string())
+                ]
+            }
+        )
+    }
+}
