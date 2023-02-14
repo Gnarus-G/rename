@@ -1,4 +1,7 @@
-use std::{fmt::Display, ops::Range};
+use std::{
+    fmt::Display,
+    ops::{Deref, Range},
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
@@ -19,18 +22,36 @@ pub enum TokenText<'t> {
     Empty,
 }
 
-impl<'a> AsRef<str> for TokenText<'a> {
-    fn as_ref(&self) -> &'a str {
+impl<'t> Deref for TokenText<'t> {
+    type Target = &'t str;
+
+    fn deref(&self) -> &Self::Target {
         match self {
-            TokenText::Slice(s) => s,
-            TokenText::Empty => "",
+            TokenText::Slice(s) => &s,
+            TokenText::Empty => &"",
+        }
+    }
+}
+
+impl<'a> TokenText<'a> {
+    pub fn len(&self) -> usize {
+        match self {
+            TokenText::Slice(s) => s.len(),
+            TokenText::Empty => 0,
         }
     }
 }
 
 impl<'t> Display for TokenText<'t> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_ref())
+        write!(
+            f,
+            "{}",
+            match self {
+                TokenText::Slice(s) => s,
+                TokenText::Empty => "",
+            }
+        )
     }
 }
 

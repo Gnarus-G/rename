@@ -1,5 +1,5 @@
 use clap::{Args, Parser, Subcommand};
-use mrp::{DefaultMatchAndReplaceStrategy, MatchAndReplaceExpression, MatchAndReplaceStrategy};
+use mrp::{DefaultMatchAndReplaceStrategy, MatchAndReplaceStrategy};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
@@ -44,7 +44,9 @@ struct SimpleArgs {
 }
 
 fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
-    let exp = MatchAndReplaceExpression::from(args.expression.as_str());
+    let exp = mrp::parser::Parser::from_input(args.expression.as_str())
+        .parse()
+        .unwrap();
     let mut replace = DefaultMatchAndReplaceStrategy::new(&exp);
 
     replace.set_strip(args.strip);
