@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn one_literal_and_int_capture() {
         let input = "lit(num:int)->lul(num)";
-        let expression = Parser::from_input(input).parse().unwrap();
+        let expression = Parser::from(input).parse().unwrap();
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         assert_eq!(strat.apply("lit12").unwrap(), "lul12");
@@ -150,16 +150,14 @@ mod tests {
     #[test]
     fn test_mrp_application() {
         let input = "(num:int)asdf->lul(num)";
-        let expression = Parser::from_input(input).parse().unwrap();
+        let expression = Parser::from(input).parse().unwrap();
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         let treated = strat.apply_all(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
 
         assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
 
-        let expression = Parser::from_input("hello(as:dig)->oh(as)hi")
-            .parse()
-            .unwrap();
+        let expression = Parser::from("hello(as:dig)->oh(as)hi").parse().unwrap();
 
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
@@ -170,9 +168,7 @@ mod tests {
 
     #[test]
     fn test_mrp_application_stripping() {
-        let expression = Parser::from_input("hello(as:dig)->oh(as)hi")
-            .parse()
-            .unwrap();
+        let expression = Parser::from("hello(as:dig)->oh(as)hi").parse().unwrap();
         let mut strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         strat.set_strip(true);
@@ -184,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_mrp_application_with_multi_digits_and_stripping() {
-        let expression = Parser::from_input("(n:int)->step(n)").parse().unwrap();
+        let expression = Parser::from("(n:int)->step(n)").parse().unwrap();
         let mut strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         strat.set_strip(true);
@@ -209,16 +205,13 @@ mod tests {
         #[test]
         fn test_mrp_application() {
             let input = "(num:int)asdf->lul(num)";
-            let expression =
-                RegexTranspilationStrategy::new(&Parser::from_input(input).parse().unwrap());
+            let expression = RegexTranspilationStrategy::new(&Parser::from(input).parse().unwrap());
 
             let treated = expression.apply_all(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
 
             assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
 
-            let expression = Parser::from_input("hello(as:dig)->oh(as)hi")
-                .parse()
-                .unwrap();
+            let expression = Parser::from("hello(as:dig)->oh(as)hi").parse().unwrap();
 
             let strat = RegexTranspilationStrategy::new(&expression);
 
@@ -229,9 +222,7 @@ mod tests {
 
         #[test]
         fn test_mrp_application_stripping() {
-            let expression = Parser::from_input("hello(as:dig)->oh(as)hi")
-                .parse()
-                .unwrap();
+            let expression = Parser::from("hello(as:dig)->oh(as)hi").parse().unwrap();
             let mut strat = RegexTranspilationStrategy::new(&expression);
 
             strat.make_pattern_strip_non_matched_parts();
@@ -243,7 +234,7 @@ mod tests {
 
         #[test]
         fn test_mrp_application_with_multi_digits_and_stripping() {
-            let expression = Parser::from_input("(n:int)->step(n)").parse().unwrap();
+            let expression = Parser::from("(n:int)->step(n)").parse().unwrap();
             let mut strat = RegexTranspilationStrategy::new(&expression);
 
             strat.make_pattern_strip_non_matched_parts();

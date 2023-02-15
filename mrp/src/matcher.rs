@@ -237,14 +237,14 @@ mod tests {
 
     #[test]
     fn special() {
-        let mut parser = Parser::from_input("hello(as:dig)->oh(as)hi");
+        let mut parser = Parser::from("hello(as:dig)->oh(as)hi");
         let exp = parser.parse_match_exp().unwrap();
         assert_eq!(exp.find_at("ashello090", 0).unwrap().as_str(), "hello0");
     }
 
     #[test]
     fn muliple_matches() {
-        let mut parser = Parser::from_input("xy(n:int)");
+        let mut parser = Parser::from("xy(n:int)");
         let pattern = parser.parse_match_exp().unwrap();
         let text = "wxy10xy33asdfxy81";
         let mut matches = Matches::new(&pattern, text);

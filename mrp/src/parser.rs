@@ -61,11 +61,19 @@ pub struct Parser<'a> {
     peeked: Option<Token<'a>>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn from_input(input: &'a str) -> Self {
+impl<'a> From<&'a str> for Parser<'a> {
+    fn from(input: &'a str) -> Self {
         Self::new(Lexer::new(input))
     }
+}
 
+impl<'a> From<&'a String> for Parser<'a> {
+    fn from(input: &'a String) -> Self {
+        Self::new(Lexer::new(&input))
+    }
+}
+
+impl<'a> Parser<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
         Self {
             lexer,

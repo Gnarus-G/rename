@@ -44,9 +44,7 @@ struct SimpleArgs {
 }
 
 fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
-    let exp = mrp::parser::Parser::from_input(args.expression.as_str())
-        .parse()
-        .unwrap();
+    let exp = mrp::parser::Parser::from(&args.expression).parse().unwrap();
     let mut replace = DefaultMatchAndReplaceStrategy::new(&exp);
 
     replace.set_strip(args.strip);

@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use mrp::{
-    DefaultMatchAndReplaceStrategy, MatchAndReplaceExpression, MatchAndReplaceStrategy,
+    parser::Parser, DefaultMatchAndReplaceStrategy, MatchAndReplaceStrategy,
     RegexTranspilationStrategy,
 };
 use regex::Regex;
@@ -14,7 +14,7 @@ fn regex_benchmark(c: &mut Criterion) {
 }
 
 fn regex_transpl_benchmark(c: &mut Criterion) {
-    let exp = MatchAndReplaceExpression::from(EXP);
+    let exp = Parser::from(EXP).parse().unwrap();
     let r = RegexTranspilationStrategy::new(&exp);
     c.bench_function("regex transpile strat", |b| {
         b.iter(|| {
@@ -24,7 +24,7 @@ fn regex_transpl_benchmark(c: &mut Criterion) {
 }
 
 fn mrp_benchmark(c: &mut Criterion) {
-    let exp = MatchAndReplaceExpression::from(EXP);
+    let exp = Parser::from(EXP).parse().unwrap();
     let r = DefaultMatchAndReplaceStrategy::new(&exp);
     c.bench_function("mrp strat", |b| {
         b.iter(|| {

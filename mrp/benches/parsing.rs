@@ -23,8 +23,7 @@ fn parsing_benchmark(c: &mut Criterion) {
     let mut parser = Parser::new(lexer);
     c.bench_function("parsing", |b| {
         b.iter(|| {
-            parser.parse_match_exp().unwrap();
-            parser.parse_replacement_exp().unwrap()
+            parser.parse().unwrap();
         })
     });
 }
