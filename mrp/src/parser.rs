@@ -58,8 +58,7 @@ pub struct MatchAndReplaceExpression<'a> {
 
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
-    token: Token<'a>,
-    peek_token: Token<'a>,
+    peeked: Option<Token<'a>>,
 }
 
 impl<'a> Parser<'a> {
@@ -68,64 +67,60 @@ impl<'a> Parser<'a> {
     }
 
     pub fn new(lexer: Lexer<'a>) -> Self {
-        let mut p = Self {
+        Self {
             lexer,
-            token: Token {
-                kind: TokenKind::End,
-                text: crate::lexer::TokenText::Empty,
-                start: 0,
-            },
-            peek_token: Token {
-                kind: TokenKind::End,
-                text: crate::lexer::TokenText::Empty,
-                start: 0,
-            },
-        };
-        p.advance();
-        p.advance();
-        p
+            peeked: None,
+        }
     }
 
-    fn advance(&mut self) {
-        self.token = self.peek_token.clone();
-        self.peek_token = self.lexer.next_token();
+    fn token(&mut self) -> Token<'a> {
+        match self.peeked.take() {
+            Some(t) => t,
+            None => self.lexer.next_token(),
+        }
+    }
+
+    fn peek_token(&mut self) -> &Token<'a> {
+        self.peeked.get_or_insert_with(|| self.lexer.next_token())
+    }
+
+    fn eat_token(&mut self) {
+        self.token();
     }
 
     pub(crate) fn parse_match_exp(&mut self) -> Result<'a, MatchExpression<'a>> {
         let mut expressions = vec![];
 
-        while self.token.kind != TokenKind::End {
-            let exp = match self.token.kind {
-                TokenKind::Literal => AbstractMatchingExpression::Literal(&self.token.text),
-                TokenKind::Ident => self.parse_capture()?,
-                TokenKind::Arrow => {
-                    self.advance();
-                    break;
-                }
+        let mut token = self.token();
+
+        while token.kind != TokenKind::End {
+            let exp = match token.kind {
+                TokenKind::Literal => AbstractMatchingExpression::Literal(&token.text),
+                TokenKind::Ident => self.parse_capture(&token.text)?,
+                TokenKind::Arrow => break,
                 _ => {
-                    self.advance();
+                    token = self.token();
                     continue;
                 }
             };
 
             expressions.push(exp);
 
-            self.advance();
+            token = self.token();
         }
 
         Ok(MatchExpression::new(expressions))
     }
 
-    fn parse_capture(&mut self) -> Result<'a, AbstractMatchingExpression<'a>> {
-        let identifier = self.token.clone();
-        self.advance();
+    fn parse_capture(&mut self, identifier: &'a str) -> Result<'a, AbstractMatchingExpression<'a>> {
+        self.eat_token();
 
         self.expect(TokenKind::DigitType)
             .or(self.expect(TokenKind::IntType))?;
 
         Ok(AbstractMatchingExpression::Capture {
-            identifier: &identifier.text,
-            identifier_type: match self.token.kind {
+            identifier,
+            identifier_type: match self.token().kind {
                 TokenKind::DigitType => CaptureType::Digit,
                 TokenKind::IntType => CaptureType::Int,
                 _ => unreachable!(),
@@ -134,33 +129,34 @@ impl<'a> Parser<'a> {
     }
 
     fn expect(&mut self, token_kind: TokenKind) -> Result<'a, ()> {
-        if self.peek_token.kind != token_kind {
-            return Err(ParseError::ExpectedToken {
-                expected: token_kind,
-                found: self.peek_token.clone(),
-            });
+        match self.peek_token() {
+            t if t.kind == token_kind => Ok(()),
+            t => {
+                return Err(ParseError::ExpectedToken {
+                    expected: token_kind,
+                    found: t.clone(),
+                });
+            }
         }
-
-        self.advance();
-        Ok(())
     }
 
     pub(crate) fn parse_replacement_exp(&mut self) -> Result<'a, ReplaceExpression<'a>> {
         let mut expressions = vec![];
 
-        while self.token.kind != TokenKind::End {
-            let exp = match &self.token.kind {
-                TokenKind::Literal => AbstractReplaceExpression::Literal(&self.token.text),
-                TokenKind::Ident => AbstractReplaceExpression::Identifier(&self.token.text),
+        let mut token = self.token();
+        while token.kind != TokenKind::End {
+            let exp = match &token.kind {
+                TokenKind::Literal => AbstractReplaceExpression::Literal(&token.text),
+                TokenKind::Ident => AbstractReplaceExpression::Identifier(&token.text),
                 _ => {
-                    self.advance();
+                    token = self.token();
                     continue;
                 }
             };
 
             expressions.push(exp);
 
-            self.advance();
+            token = self.token();
         }
 
         Ok(ReplaceExpression { expressions })
