@@ -8,9 +8,9 @@ use std::borrow::Cow;
 use parser::{AbstractMatchingExpression, AbstractReplaceExpression, MatchAndReplaceExpression};
 
 /// Representing a stragety by which to match and replace on a `string` value
-pub trait MatchAndReplaceStrategy {
+pub trait MatchAndReplaceStrategy<'m> {
     /// Match and replace
-    fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>>;
+    fn apply<'sf, 's: 'sf + 'm>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>>;
 }
 
 pub struct DefaultMatchAndReplaceStrategy<'m> {
@@ -30,8 +30,8 @@ impl<'m> DefaultMatchAndReplaceStrategy<'m> {
     }
 }
 
-impl<'m> MatchAndReplaceStrategy for DefaultMatchAndReplaceStrategy<'m> {
-    fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
+impl<'m> MatchAndReplaceStrategy<'m> for DefaultMatchAndReplaceStrategy<'m> {
+    fn apply<'sf, 's: 'sf + 'm>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
         match self.mrex.mex.find_at(value, 0) {
             None => None,
             Some(m) => {
@@ -42,7 +42,7 @@ impl<'m> MatchAndReplaceStrategy for DefaultMatchAndReplaceStrategy<'m> {
                     .expressions
                     .iter()
                     .map(|e| match e {
-                        AbstractReplaceExpression::Literal(l) => l.to_string(),
+                        AbstractReplaceExpression::Literal(l) => *l,
                         AbstractReplaceExpression::Identifier(i) => self
                             .mrex
                             .mex
@@ -113,8 +113,8 @@ impl RegexTranspilationStrategy {
     }
 }
 
-impl MatchAndReplaceStrategy for RegexTranspilationStrategy {
-    fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
+impl<'m> MatchAndReplaceStrategy<'m> for RegexTranspilationStrategy {
+    fn apply<'sf, 's: 'sf + 'm>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
         let pattern = &self.regex;
 
         if !pattern.is_match(value) {
@@ -130,7 +130,10 @@ mod tests {
     use super::*;
 
     impl<'m> DefaultMatchAndReplaceStrategy<'m> {
-        fn apply_all<'sf, 's: 'sf>(&'s self, values: Vec<&'s str>) -> Vec<std::borrow::Cow<str>> {
+        fn apply_all<'sf, 's: 'sf + 'm>(
+            &'s self,
+            values: Vec<&'s str>,
+        ) -> Vec<std::borrow::Cow<str>> {
             return values.iter().filter_map(|s| self.apply(s)).collect();
         }
     }

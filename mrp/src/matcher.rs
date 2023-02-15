@@ -14,7 +14,7 @@ impl<'t> Match<'t> {
 
 impl<'a> MatchExpression<'a> {
     /// Find the leftmost-first match in the input starting at the given position
-    pub fn find_at<'t, 's: 'a>(&'s self, input: &'t str, start: usize) -> Option<Match<'t>> {
+    pub fn find_at<'t: 'a, 's: 'a>(&'s self, input: &'t str, start: usize) -> Option<Match<'t>> {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
@@ -58,12 +58,13 @@ impl<'a> MatchExpression<'a> {
                     identifier_type,
                 } => match identifier_type {
                     CaptureType::Digit => {
-                        let ch = input.as_bytes()[curr_position] as char;
+                        let ch = input.as_bytes()[curr_position];
+                        let ch_str = &input[curr_position..curr_position + 1];
 
                         if ch.is_ascii_digit() {
                             curr_position += 1;
                             state += 1;
-                            captures_map.insert(identifier.as_ref(), ch.to_string());
+                            captures_map.insert(identifier.as_ref(), ch_str);
                         } else {
                             curr_position += 1;
                             state = 0;
@@ -74,10 +75,7 @@ impl<'a> MatchExpression<'a> {
 
                         dbg!(&identifier);
                         let mut capture = |start: usize, curr_position: usize| {
-                            captures_map.insert(
-                                identifier.as_ref(),
-                                input[start..curr_position].to_string(),
-                            );
+                            captures_map.insert(identifier.as_ref(), &input[start..curr_position]);
                             dbg!(&captures_map);
                         };
 
@@ -143,7 +141,7 @@ impl<'t, 'm> Matches<'t, 'm> {
     }
 }
 
-impl<'t, 'm> Iterator for Matches<'t, 'm> {
+impl<'t: 'm, 'm> Iterator for Matches<'t, 'm> {
     type Item = Match<'t>;
 
     fn next(&mut self) -> Option<Self::Item> {
