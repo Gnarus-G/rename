@@ -73,10 +73,8 @@ impl<'a> MatchExpression<'a> {
                     CaptureType::Int => {
                         let ch = input.as_bytes()[curr_position] as char;
 
-                        dbg!(&identifier);
                         let mut capture = |start: usize, curr_position: usize| {
                             captures_map.insert(identifier.as_ref(), &input[start..curr_position]);
-                            dbg!(&captures_map);
                         };
 
                         if ch.is_ascii_digit() {
