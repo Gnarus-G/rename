@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, Range},
 };
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum TokenKind {
     Literal,
     Lparen,
@@ -16,7 +16,7 @@ pub enum TokenKind {
     End,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub enum TokenText<'t> {
     Slice(&'t str),
     Empty,
@@ -55,7 +55,7 @@ impl<'t> Display for TokenText<'t> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq)]
 pub struct Token<'t> {
     pub kind: TokenKind,
     pub text: TokenText<'t>,

@@ -142,7 +142,9 @@ impl<'a> Parser<'a> {
             t => {
                 return Err(ParseError::ExpectedToken {
                     expected: token_kind,
-                    found: t.clone(),
+                    found: t.kind,
+                    position: t.start,
+                    text: &t.text,
                 });
             }
         }
@@ -182,8 +184,6 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::lexer::TokenText;
 
     use super::*;
 
@@ -274,11 +274,9 @@ mod tests {
             p.parse_match_exp().unwrap_err(),
             ParseError::ExpectedToken {
                 expected: TokenKind::IntType,
-                found: Token {
-                    kind: TokenKind::Rparen,
-                    text: TokenText::Empty,
-                    start: 7
-                }
+                found: TokenKind::Rparen,
+                text: "",
+                position: 7
             }
         );
     }
