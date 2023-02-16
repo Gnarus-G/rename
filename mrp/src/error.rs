@@ -64,3 +64,44 @@ impl<'t> std::fmt::Display for ParseError<'t> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::Parser;
+
+    #[test]
+    fn expecting_types() {
+        let input = "t(n:)8";
+        let err = Parser::from(input).parse().unwrap_err();
+
+        assert_eq!(
+            err,
+            ParseError {
+                input,
+                kind: super::ParseErrorKind::ExpectedToken {
+                    expected: TokenKind::IntType,
+                    found: TokenKind::Rparen,
+                    text: ")",
+                    position: 4
+                }
+            }
+        );
+
+        let input = "t(n:di)8";
+        let err = Parser::from(input).parse().unwrap_err();
+
+        assert_eq!(
+            err,
+            ParseError {
+                input,
+                kind: ParseErrorKind::ExpectedToken {
+                    expected: TokenKind::IntType,
+                    found: TokenKind::Literal,
+                    text: "di",
+                    position: 4
+                }
+            }
+        )
+    }
+}

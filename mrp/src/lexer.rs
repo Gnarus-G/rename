@@ -181,7 +181,11 @@ impl<'a> Lexer<'a> {
                 text: TokenText::Slice(text),
                 start,
             },
-            _ => unreachable!(),
+            s => Token {
+                kind: TokenKind::Literal,
+                text: TokenText::Slice(s),
+                start,
+            },
         }
     }
 
