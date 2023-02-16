@@ -123,15 +123,22 @@ impl<'a> Parser<'a> {
     fn parse_capture(&mut self, identifier: &'a str) -> Result<'a, AbstractMatchingExpression<'a>> {
         self.eat_token();
 
-        self.expect(TokenKind::DigitType)
-            .or(self.expect(TokenKind::IntType))?;
+        self.expect(TokenKind::Type)?;
 
         Ok(AbstractMatchingExpression::Capture {
             identifier,
-            identifier_type: match self.token().kind {
-                TokenKind::DigitType => CaptureType::Digit,
-                TokenKind::IntType => CaptureType::Int,
-                _ => unreachable!(),
+            identifier_type: match self.token() {
+                t if t.kind == TokenKind::Type => match *t.text {
+                    "int" => CaptureType::Int,
+                    "dig" => CaptureType::Digit,
+                    _ => {
+                        return Err(ParseError {
+                            input: self.lexer.input(),
+                            kind: ParseErrorKind::UnsupportedToken(t),
+                        })
+                    }
+                },
+                _ => unreachable!("we expected a type token"),
             },
         })
     }
@@ -278,7 +285,7 @@ mod tests {
             ParseError {
                 input,
                 kind: ParseErrorKind::ExpectedToken {
-                    expected: TokenKind::IntType,
+                    expected: TokenKind::Type,
                     found: TokenKind::Rparen,
                     text: ")",
                     position: 7

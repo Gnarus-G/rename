@@ -8,8 +8,7 @@ pub enum TokenKind {
     Literal,
     Lparen,
     Rparen,
-    DigitType,
-    IntType,
+    Type,
     Ident,
     Colon,
     Arrow,
@@ -170,22 +169,10 @@ impl<'a> Lexer<'a> {
         let start = self.position;
         let (s, e) = self.read_while(|c| c.is_ascii_alphabetic());
         let slice = self.input_slice(s..e);
-        match slice {
-            text @ "dig" => Token {
-                kind: TokenKind::DigitType,
-                text: TokenText::Slice(text),
-                start,
-            },
-            text @ "int" => Token {
-                kind: TokenKind::IntType,
-                text: TokenText::Slice(text),
-                start,
-            },
-            s => Token {
-                kind: TokenKind::Literal,
-                text: TokenText::Slice(s),
-                start,
-            },
+        Token {
+            kind: TokenKind::Type,
+            text: TokenText::Slice(slice),
+            start,
         }
     }
 
@@ -234,8 +221,6 @@ mod tests {
             text: TokenText::Slice(match kind {
                 Lparen => "(",
                 Rparen => ")",
-                DigitType => "dig",
-                IntType => "int",
                 Colon => ":",
                 Arrow => "->",
                 _ => unreachable!("bad test case"),
@@ -266,7 +251,7 @@ mod tests {
         assert_eq!(l.next_token(), token(Lparen, 2));
         assert_eq!(l.next_token(), token_string(Ident, "d", 3));
         assert_eq!(l.next_token(), token(Colon, 4));
-        assert_eq!(l.next_token(), token(DigitType, 5));
+        assert_eq!(l.next_token(), token_string(Type, "dig", 5));
         assert_eq!(l.next_token(), token(Rparen, 8));
     }
 
@@ -277,7 +262,7 @@ mod tests {
         assert_eq!(l.next_token(), token(Lparen, 1));
         assert_eq!(l.next_token(), token_string(Ident, "i", 2));
         assert_eq!(l.next_token(), token(Colon, 3));
-        assert_eq!(l.next_token(), token(IntType, 4));
+        assert_eq!(l.next_token(), token_string(Type, "int", 4));
         assert_eq!(l.next_token(), token(Rparen, 7));
     }
 
@@ -289,14 +274,14 @@ mod tests {
         assert_eq!(l.next_token(), token(Lparen, 6));
         assert_eq!(l.next_token(), token_string(Ident, "x", 7));
         assert_eq!(l.next_token(), token(Colon, 8));
-        assert_eq!(l.next_token(), token(DigitType, 9));
+        assert_eq!(l.next_token(), token_string(Type, "dig", 9));
         assert_eq!(l.next_token(), token(Rparen, 12));
 
         assert_eq!(l.next_token(), token_string(Literal, "zap", 13));
         assert_eq!(l.next_token(), token(Lparen, 16));
         assert_eq!(l.next_token(), token_string(Ident, "i", 17));
         assert_eq!(l.next_token(), token(Colon, 18));
-        assert_eq!(l.next_token(), token(IntType, 19));
+        assert_eq!(l.next_token(), token_string(Type, "int", 19));
         assert_eq!(l.next_token(), token(Rparen, 22));
     }
 
@@ -307,13 +292,13 @@ mod tests {
         assert_eq!(l.next_token(), token(Lparen, 2));
         assert_eq!(l.next_token(), token_string(Ident, "d", 3));
         assert_eq!(l.next_token(), token(Colon, 4));
-        assert_eq!(l.next_token(), token(DigitType, 5));
+        assert_eq!(l.next_token(), token_string(Type, "dig", 5));
         assert_eq!(l.next_token(), token(Rparen, 8));
 
         assert_eq!(l.next_token(), token(Lparen, 9));
         assert_eq!(l.next_token(), token_string(Ident, "num", 10));
         assert_eq!(l.next_token(), token(Colon, 13));
-        assert_eq!(l.next_token(), token(IntType, 14));
+        assert_eq!(l.next_token(), token_string(Type, "int", 14));
         assert_eq!(l.next_token(), token(Rparen, 17));
     }
 
@@ -324,7 +309,7 @@ mod tests {
         assert_eq!(l.next_token(), token(Lparen, 1));
         assert_eq!(l.next_token(), token_string(Ident, "n", 2));
         assert_eq!(l.next_token(), token(Colon, 3));
-        assert_eq!(l.next_token(), token(DigitType, 4));
+        assert_eq!(l.next_token(), token_string(Type, "dig", 4));
         assert_eq!(l.next_token(), token(Rparen, 7));
         assert_eq!(l.next_token(), token(Arrow, 8));
         assert_eq!(l.next_token(), token(Lparen, 10));

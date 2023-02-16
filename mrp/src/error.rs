@@ -21,7 +21,7 @@ impl Display for TokenKind {
 
         return match self {
             Literal => write!(f, "literal"),
-            DigitType | IntType => write!(f, "type keyword - 'int' or 'dig'"),
+            Type => write!(f, "type keyword - 'int' or 'dig'"),
             Ident => write!(f, "identifier"),
             Arrow => write!(f, "pattern seperator"),
             End => write!(f, "\0"),
@@ -80,7 +80,7 @@ mod tests {
             ParseError {
                 input,
                 kind: super::ParseErrorKind::ExpectedToken {
-                    expected: TokenKind::IntType,
+                    expected: TokenKind::Type,
                     found: TokenKind::Rparen,
                     text: ")",
                     position: 4
@@ -95,12 +95,11 @@ mod tests {
             err,
             ParseError {
                 input,
-                kind: ParseErrorKind::ExpectedToken {
-                    expected: TokenKind::IntType,
-                    found: TokenKind::Literal,
-                    text: "di",
-                    position: 4
-                }
+                kind: ParseErrorKind::UnsupportedToken(Token {
+                    kind: TokenKind::Type,
+                    text: crate::lexer::TokenText::Slice("di"),
+                    start: 4
+                })
             }
         )
     }
