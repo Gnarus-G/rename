@@ -76,8 +76,12 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    pub fn input(&self) -> &'a str {
+        std::str::from_utf8(&self.input).expect("input should only contain utf-8 characters")
+    }
+
     fn input_slice(&self, range: Range<usize>) -> &'a str {
-        std::str::from_utf8(&self.input[range]).expect("input to only contain utf-8 characters")
+        std::str::from_utf8(&self.input[range]).expect("input should only contain utf-8 characters")
     }
 
     fn char_at(&self, position: usize) -> Option<&u8> {
@@ -137,7 +141,11 @@ impl<'a> Lexer<'a> {
                 b'(' => self.char_token(TokenKind::Lparen),
                 b')' => self.char_token(TokenKind::Rparen),
                 b'-' if self.if_peek(b'>') => {
-                    let t = self.char_token(TokenKind::Arrow);
+                    let t = Token {
+                        kind: TokenKind::Arrow,
+                        text: TokenText::Slice(self.input_slice(self.position..self.position + 2)),
+                        start: self.position,
+                    };
                     self.step();
                     t
                 }
@@ -162,15 +170,18 @@ impl<'a> Lexer<'a> {
         let start = self.position;
         let (s, e) = self.read_while(|c| c.is_ascii_alphabetic());
         let slice = self.input_slice(s..e);
-        let kind = match slice {
-            "dig" => TokenKind::DigitType,
-            "int" => TokenKind::IntType,
+        match slice {
+            text @ "dig" => Token {
+                kind: TokenKind::DigitType,
+                text: TokenText::Slice(text),
+                start,
+            },
+            text @ "int" => Token {
+                kind: TokenKind::IntType,
+                text: TokenText::Slice(text),
+                start,
+            },
             _ => unreachable!(),
-        };
-        Token {
-            kind,
-            text: TokenText::Empty,
-            start,
         }
     }
 
@@ -202,7 +213,7 @@ impl<'a> Lexer<'a> {
     fn char_token(&self, kind: TokenKind) -> Token<'a> {
         Token {
             kind,
-            text: TokenText::Empty,
+            text: TokenText::Slice(self.input_slice(self.position..self.position + 1)),
             start: self.position,
         }
     }
@@ -216,7 +227,15 @@ mod tests {
     fn token<'s>(kind: TokenKind, start: usize) -> Token<'s> {
         Token {
             kind,
-            text: TokenText::Empty,
+            text: TokenText::Slice(match kind {
+                Lparen => "(",
+                Rparen => ")",
+                DigitType => "dig",
+                IntType => "int",
+                Colon => ":",
+                Arrow => "->",
+                _ => unreachable!("bad test case"),
+            }),
             start,
         }
     }

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
-    error::{ParseError, Result},
+    error::{ParseError, ParseErrorKind, Result},
     lexer::{Lexer, Token, TokenKind},
 };
 
@@ -137,17 +137,20 @@ impl<'a> Parser<'a> {
     }
 
     fn expect(&mut self, token_kind: TokenKind) -> Result<'a, ()> {
-        match self.peek_token() {
-            t if t.kind == token_kind => Ok(()),
-            t => {
-                return Err(ParseError::ExpectedToken {
-                    expected: token_kind,
-                    found: t.kind,
-                    position: t.start,
-                    text: &t.text,
-                });
-            }
-        }
+        let error_kind = match self.peek_token() {
+            t if t.kind == token_kind => return Ok(()),
+            t => ParseErrorKind::ExpectedToken {
+                expected: token_kind,
+                found: t.kind,
+                position: t.start,
+                text: &t.text,
+            },
+        };
+
+        Err(ParseError {
+            input: self.lexer.input(),
+            kind: error_kind,
+        })
     }
 
     pub(crate) fn parse_replacement_exp(&mut self) -> Result<'a, ReplaceExpression<'a>> {
@@ -272,11 +275,14 @@ mod tests {
         let mut p = Parser::new(Lexer::new(input));
         assert_eq!(
             p.parse_match_exp().unwrap_err(),
-            ParseError::ExpectedToken {
-                expected: TokenKind::IntType,
-                found: TokenKind::Rparen,
-                text: "",
-                position: 7
+            ParseError {
+                input,
+                kind: ParseErrorKind::ExpectedToken {
+                    expected: TokenKind::IntType,
+                    found: TokenKind::Rparen,
+                    text: ")",
+                    position: 7
+                }
             }
         );
     }
