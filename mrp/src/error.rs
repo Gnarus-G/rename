@@ -87,6 +87,8 @@ impl<'t> std::fmt::Display for ParseError<'t> {
 mod tests {
     use super::*;
     use crate::parser::Parser;
+    use ParseErrorKind::*;
+    use TokenKind::*;
 
     macro_rules! assert_error {
         ($input:literal, $error_kind:expr) => {
@@ -122,6 +124,39 @@ mod tests {
                 found: TokenKind::Rparen,
                 text: ")",
                 position: 11
+            }
+        );
+    }
+
+    #[test]
+    fn expecting_capture_closing_paren() {
+        assert_error!(
+            "(n:int",
+            ExpectedToken {
+                expected: Rparen,
+                found: End,
+                text: "",
+                position: 6
+            }
+        );
+
+        assert_error!(
+            "(n:int ",
+            ExpectedToken {
+                expected: Rparen,
+                found: Literal,
+                text: " ",
+                position: 6
+            }
+        );
+
+        assert_error!(
+            "(n:int->(n)",
+            ExpectedToken {
+                expected: Rparen,
+                found: Arrow,
+                text: "->",
+                position: 6
             }
         );
     }

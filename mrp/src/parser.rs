@@ -104,14 +104,19 @@ impl<'a> Parser<'a> {
         use TokenKind::*;
 
         while token.kind != End {
+            if let Lparen = token.kind {
+                self.expect(Ident)?;
+            }
+
             let exp = match token.kind {
                 Literal => AbstractMatchingExpression::Literal(&token.text),
-                Ident => self.parse_capture(&token.text)?,
+                Ident => {
+                    let exp = self.parse_capture(&token.text)?;
+                    self.expect(Rparen)?;
+                    exp
+                }
                 Arrow => break,
-                tk => {
-                    if let Lparen = tk {
-                        self.expect(Ident)?;
-                    }
+                _ => {
                     token = self.token();
                     continue;
                 }
