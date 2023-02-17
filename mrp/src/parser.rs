@@ -101,12 +101,17 @@ impl<'a> Parser<'a> {
 
         let mut token = self.token();
 
-        while token.kind != TokenKind::End {
+        use TokenKind::*;
+
+        while token.kind != End {
             let exp = match token.kind {
-                TokenKind::Literal => AbstractMatchingExpression::Literal(&token.text),
-                TokenKind::Ident => self.parse_capture(&token.text)?,
-                TokenKind::Arrow => break,
-                _ => {
+                Literal => AbstractMatchingExpression::Literal(&token.text),
+                Ident => self.parse_capture(&token.text)?,
+                Arrow => break,
+                tk => {
+                    if let Lparen = tk {
+                        self.expect(Ident)?;
+                    }
                     token = self.token();
                     continue;
                 }
@@ -164,10 +169,16 @@ impl<'a> Parser<'a> {
         let mut expressions = vec![];
 
         let mut token = self.token();
-        while token.kind != TokenKind::End {
+
+        use TokenKind::*;
+        while token.kind != End {
+            if let Lparen = token.kind {
+                self.expect(Ident)?;
+            }
+
             let exp = match &token.kind {
-                TokenKind::Literal => AbstractReplaceExpression::Literal(&token.text),
-                TokenKind::Ident => AbstractReplaceExpression::Identifier(&token.text),
+                Literal => AbstractReplaceExpression::Literal(&token.text),
+                Ident => AbstractReplaceExpression::Identifier(&token.text),
                 _ => {
                     token = self.token();
                     continue;

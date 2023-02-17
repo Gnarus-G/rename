@@ -88,37 +88,63 @@ mod tests {
     use super::*;
     use crate::parser::Parser;
 
-    #[test]
-    fn expecting_types() {
-        let input = "t(n:)8";
-        let err = Parser::from(input).parse().unwrap_err();
+    macro_rules! assert_error {
+        ($input:literal, $error_kind:expr) => {
+            let input = $input;
+            let err = Parser::from(input).parse().unwrap_err();
 
-        assert_eq!(
-            err,
-            ParseError {
-                input,
-                kind: super::ParseErrorKind::ExpectedToken {
-                    expected: TokenKind::Type,
-                    found: TokenKind::Rparen,
-                    text: ")",
-                    position: 4
+            assert_eq!(
+                err,
+                ParseError {
+                    input: $input,
+                    kind: $error_kind
                 }
+            );
+        };
+    }
+
+    #[test]
+    fn expecting_identifier() {
+        assert_error!(
+            "a(:int)",
+            ParseErrorKind::ExpectedToken {
+                expected: TokenKind::Ident,
+                found: TokenKind::Colon,
+                text: ":",
+                position: 2
             }
         );
 
-        let input = "t(n:di)8";
-        let err = Parser::from(input).parse().unwrap_err();
-
-        assert_eq!(
-            err,
-            ParseError {
-                input,
-                kind: ParseErrorKind::UnsupportedToken(Token {
-                    kind: TokenKind::Type,
-                    text: crate::lexer::TokenText::Slice("di"),
-                    start: 4
-                })
+        assert_error!(
+            "a(n:int)->()",
+            ParseErrorKind::ExpectedToken {
+                expected: TokenKind::Ident,
+                found: TokenKind::Rparen,
+                text: ")",
+                position: 11
             }
-        )
+        );
+    }
+
+    #[test]
+    fn expecting_types() {
+        assert_error!(
+            "t(n:)8",
+            super::ParseErrorKind::ExpectedToken {
+                expected: TokenKind::Type,
+                found: TokenKind::Rparen,
+                text: ")",
+                position: 4
+            }
+        );
+
+        assert_error!(
+            "t(n:di)8",
+            ParseErrorKind::UnsupportedToken(Token {
+                kind: TokenKind::Type,
+                text: crate::lexer::TokenText::Slice("di"),
+                start: 4
+            })
+        );
     }
 }
