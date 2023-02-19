@@ -20,15 +20,6 @@ pub enum AbstractMatchingExpression<'a> {
     },
 }
 
-impl<'a> AbstractMatchingExpression<'a> {
-    fn is_capture(&self) -> bool {
-        match self {
-            AbstractMatchingExpression::Literal(_) => false,
-            AbstractMatchingExpression::Capture { .. } => true,
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum AbstractReplaceExpression<'a> {
     Literal(&'a str),
