@@ -4,7 +4,7 @@ use mrp::{
     parser::Parser,
 };
 
-const EXPRESSION: &str = "aywer(n:dig)(num:int)asdf(lawerasdf:int)->lul(num)(n)asd(lasdkjf)(weoyr)";
+const EXPRESSION: &str = "aywer(n:dig)(num:int)asdf(lawerasdf:int)(lasdkjf:dig)et(weoyr:int)->lul(num)(n)asd(lasdkjf)(weoyr)";
 
 fn lexing_benchmark(c: &mut Criterion) {
     let mut lexer = Lexer::new(EXPRESSION);
