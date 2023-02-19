@@ -131,6 +131,16 @@ mod tests {
         );
 
         assert_error!(
+            "a(n:int)->(",
+            ParseErrorKind::ExpectedToken {
+                expected: TokenKind::Ident,
+                found: TokenKind::End,
+                text: "",
+                position: 11
+            }
+        );
+
+        assert_error!(
             "a(n:int)->()",
             ParseErrorKind::ExpectedToken {
                 expected: TokenKind::Ident,
