@@ -1,7 +1,7 @@
 use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
-use mrp::{DefaultMatchAndReplaceStrategy, MatchAndReplaceStrategy};
+use mrp::{MatchAndReplaceStrategy, MatchAndReplacer};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
@@ -34,9 +34,9 @@ fn main() -> ExitCode {
         Command::REGEX(ref args) => handle_regex_replacement(&args, &base_args),
         Command::SIMPLE(ref args) => match mrp::parser::Parser::from(&args.expression).parse() {
             Ok(ref e) => {
-                let mut replace = DefaultMatchAndReplaceStrategy::new(e);
-                replace.set_strip(args.strip);
-                handle_mrp_replacement(&base_args, replace);
+                let mut replacer = MatchAndReplacer::new(e);
+                replacer.set_strip(args.strip);
+                handle_mrp_replacement(&base_args, replacer);
             }
             Err(e) => {
                 eprintln!("{e}");
@@ -57,10 +57,7 @@ struct SimpleArgs {
     strip: bool,
 }
 
-fn handle_mrp_replacement<'e>(
-    base_args: &'e RenameArgs,
-    replace: DefaultMatchAndReplaceStrategy<'e>,
-) {
+fn handle_mrp_replacement<'e>(base_args: &'e RenameArgs, replacer: MatchAndReplacer<'e>) {
     base_args
         .paths
         .iter()
@@ -73,7 +70,7 @@ fn handle_mrp_replacement<'e>(
 
             return str;
         })
-        .map(|p| (p, replace.apply(p)))
+        .map(|p| (p, replacer.apply(p)))
         .filter_map(|(from, to)| to.map(|t| (from, t)))
         .for_each(|(from, to)| {
             if base_args.dry_run {
