@@ -1,3 +1,5 @@
+use std::process::ExitCode;
+
 use clap::{Args, Parser, Subcommand};
 use mrp::{DefaultMatchAndReplaceStrategy, MatchAndReplaceStrategy};
 
@@ -25,7 +27,7 @@ enum Command {
     REGEX(RegexArgs),
 }
 
-fn main() {
+fn main() -> ExitCode {
     let base_args = RenameArgs::parse();
 
     match base_args.command {
@@ -36,9 +38,14 @@ fn main() {
                 replace.set_strip(args.strip);
                 handle_mrp_replacement(&base_args, replace);
             }
-            Err(e) => eprintln!("{e}"),
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::FAILURE;
+            }
         },
     };
+
+    ExitCode::SUCCESS
 }
 
 #[derive(Debug, Args)]
