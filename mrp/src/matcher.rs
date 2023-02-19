@@ -1,14 +1,4 @@
-use crate::lexer::Token;
-use crate::parser::{AbstractMatchingExpression, MatchExpression};
-
-#[cfg(test)]
-impl<'s> From<&'s str> for MatchExpression<'s> {
-    fn from(s: &'s str) -> Self {
-        crate::parser::Parser::new(crate::lexer::Lexer::new(s))
-            .parse_match_exp()
-            .unwrap()
-    }
-}
+use crate::parser::{AbstractMatchingExpression, CaptureType, MatchExpression};
 
 pub struct Match<'t> {
     text: &'t str,
@@ -22,9 +12,9 @@ impl<'t> Match<'t> {
     }
 }
 
-impl<'s> MatchExpression<'s> {
+impl<'a> MatchExpression<'a> {
     /// Find the leftmost-first match in the input starting at the given position
-    pub fn find_at<'t>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
+    pub fn find_at<'t: 'a, 's: 'a>(&'s self, input: &'t str, start: usize) -> Option<Match<'t>> {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
@@ -53,7 +43,7 @@ impl<'s> MatchExpression<'s> {
 
                     let slice = &input[slice_range];
 
-                    let is_match = slice == literal;
+                    let is_match = slice == *literal;
 
                     if is_match {
                         state += 1;
@@ -63,27 +53,28 @@ impl<'s> MatchExpression<'s> {
                         continue;
                     }
                 }
-                AbstractMatchingExpression::Capture { identifier, typing } => match typing {
-                    Token::DigitType => {
-                        let ch = input.as_bytes()[curr_position] as char;
+                AbstractMatchingExpression::Capture {
+                    identifier,
+                    identifier_type,
+                } => match identifier_type {
+                    CaptureType::Digit => {
+                        let ch = input.as_bytes()[curr_position];
+                        let ch_str = &input[curr_position..curr_position + 1];
 
                         if ch.is_ascii_digit() {
                             curr_position += 1;
                             state += 1;
-                            captures_map.insert(identifier.to_string(), ch.to_string());
+                            captures_map.insert(identifier.as_ref(), ch_str);
                         } else {
                             curr_position += 1;
                             state = 0;
                         }
                     }
-                    Token::IntType => {
+                    CaptureType::Int => {
                         let ch = input.as_bytes()[curr_position] as char;
 
                         let mut capture = |start: usize, curr_position: usize| {
-                            captures_map.insert(
-                                identifier.to_string(),
-                                input[start..curr_position].to_string(),
-                            );
+                            captures_map.insert(identifier.as_ref(), &input[start..curr_position]);
                         };
 
                         if ch.is_ascii_digit() {
@@ -111,7 +102,6 @@ impl<'s> MatchExpression<'s> {
                             state = 0;
                         }
                     }
-                    t => panic!("{t} is an invalid capture type"),
                 },
             }
         }
@@ -127,7 +117,7 @@ impl<'s> MatchExpression<'s> {
         None
     }
 
-    pub fn find_iter<'m, 't>(&'m self, text: &'t str) -> Matches<'t, 'm> {
+    pub fn find_iter<'m: 'a, 't>(&'m self, text: &'t str) -> Matches<'t, 'm> {
         Matches::new(self, text)
     }
 }
@@ -140,7 +130,7 @@ pub struct Matches<'t, 'm> {
 }
 
 impl<'t, 'm> Matches<'t, 'm> {
-    pub fn new(mex: &'m MatchExpression, text: &'t str) -> Self {
+    pub fn new(mex: &'m MatchExpression<'m>, text: &'t str) -> Self {
         Self {
             text,
             mex,
@@ -149,7 +139,7 @@ impl<'t, 'm> Matches<'t, 'm> {
     }
 }
 
-impl<'t, 'm> Iterator for Matches<'t, 'm> {
+impl<'t: 'm, 'm> Iterator for Matches<'t, 'm> {
     type Item = Match<'t>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -175,50 +165,25 @@ mod tests {
 
     use super::*;
 
-    fn match_on(pattern: MatchExpression, input: &str) -> bool {
-        Matches::new(&pattern, input).count() > 0
-    }
-
     #[test]
-    fn one() {
-        let exp = Parser::new(Lexer::new("abc")).parse_match_exp().unwrap();
-        assert_eq!(match_on(exp, "b"), false);
-    }
+    fn match_counts() {
+        macro_rules! assert_match_on {
+            ($pattern:literal, $input:literal) => {
+                let exp = Parser::new(Lexer::new($pattern)).parse_match_exp().unwrap();
+                assert!(Matches::new(&exp, $input).count() > 0);
+            };
+            ($pattern:literal, $input:literal, $boolean:literal) => {
+                let exp = Parser::new(Lexer::new($pattern)).parse_match_exp().unwrap();
+                assert_eq!(Matches::new(&exp, $input).count() > 0, $boolean);
+            };
+        }
 
-    #[test]
-    fn two() {
-        let exp = Parser::new(Lexer::new("ab")).parse_match_exp().unwrap();
-        assert_eq!(match_on(exp, "abc"), true);
-    }
-
-    #[test]
-    fn three() {
-        let exp = Parser::new(Lexer::new("abc")).parse_match_exp().unwrap();
-        assert_eq!(match_on(exp, "abab5"), false);
-    }
-
-    #[test]
-    fn four() {
-        let exp = Parser::new(Lexer::new("ab(n:int)"))
-            .parse_match_exp()
-            .unwrap();
-        assert_eq!(match_on(exp, "ab345"), true);
-    }
-
-    #[test]
-    fn sub_str_at_the_end() {
-        let exp = Parser::new(Lexer::new("ab(n:int)"))
-            .parse_match_exp()
-            .unwrap();
-        assert_eq!(match_on(exp, "helloab345"), true);
-    }
-
-    #[test]
-    fn five() {
-        let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
-            .parse_match_exp()
-            .unwrap();
-        assert_eq!(match_on(exp, "abb"), false);
+        assert_match_on!("abc", "b", false);
+        assert_match_on!("ab", "abc");
+        assert_match_on!("abc", "abab5", false);
+        assert_match_on!("ab(n:int)", "ab345");
+        assert_match_on!("ab(n:int)", "helloab345");
+        assert_match_on!("ab(n:int)love(i:int)", "abb", false);
     }
 
     #[test]
@@ -272,13 +237,15 @@ mod tests {
 
     #[test]
     fn special() {
-        let exp = MatchExpression::from("hello(as:dig)->oh(as)hi");
+        let mut parser = Parser::from("hello(as:dig)->oh(as)hi");
+        let exp = parser.parse_match_exp().unwrap();
         assert_eq!(exp.find_at("ashello090", 0).unwrap().as_str(), "hello0");
     }
 
     #[test]
     fn muliple_matches() {
-        let pattern = MatchExpression::from("xy(n:int)");
+        let mut parser = Parser::from("xy(n:int)");
+        let pattern = parser.parse_match_exp().unwrap();
         let text = "wxy10xy33asdfxy81";
         let mut matches = Matches::new(&pattern, text);
 

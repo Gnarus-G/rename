@@ -1,41 +1,47 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
-    error::{ParseError, Result},
-    lexer::{Lexer, Token},
+    error::{ParseError, ParseErrorKind, Result},
+    lexer::{Lexer, Token, TokenKind},
 };
 
 #[derive(Debug, PartialEq)]
-pub enum AbstractMatchingExpression<'t> {
-    Literal(String),
+pub enum CaptureType {
+    Int,
+    Digit,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AbstractMatchingExpression<'a> {
+    Literal(&'a str),
     Capture {
-        identifier: Token<'t>,
-        typing: Token<'t>,
+        identifier: &'a str,
+        identifier_type: CaptureType,
     },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum AbstractReplaceExpression<'s> {
-    Literal(String),
-    Identifier(&'s str),
+pub enum AbstractReplaceExpression<'a> {
+    Literal(&'a str),
+    Identifier(&'a str),
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MatchExpression<'s> {
-    pub expressions: Vec<AbstractMatchingExpression<'s>>,
-    pub captures: RefCell<HashMap<String, String>>,
+pub struct MatchExpression<'a> {
+    pub expressions: Vec<AbstractMatchingExpression<'a>>,
+    pub captures: RefCell<HashMap<&'a str, &'a str>>,
 }
 
-impl<'s> MatchExpression<'s> {
-    pub fn new(expressions: Vec<AbstractMatchingExpression<'s>>) -> Self {
+impl<'a> MatchExpression<'a> {
+    pub fn new(expressions: Vec<AbstractMatchingExpression<'a>>) -> Self {
         Self {
             expressions,
             captures: RefCell::new(HashMap::new()),
         }
     }
 
-    pub fn get_capture(&self, name: &str) -> Option<String> {
-        self.captures.borrow().get(name).map(|s| s.to_string())
+    pub fn get_capture(&self, name: &str) -> Option<&str> {
+        self.captures.borrow().get(name).map(|s| *s)
     }
 }
 
@@ -44,107 +50,205 @@ pub struct ReplaceExpression<'a> {
     pub expressions: Vec<AbstractReplaceExpression<'a>>,
 }
 
+#[derive(Debug, PartialEq)]
+pub struct MatchAndReplaceExpression<'a> {
+    pub mex: MatchExpression<'a>,
+    pub rex: ReplaceExpression<'a>,
+}
+
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
-    token: Token<'a>,
-    peek_token: Token<'a>,
+    peeked: Option<Token<'a>>,
+}
+
+impl<'a> From<&'a str> for Parser<'a> {
+    fn from(input: &'a str) -> Self {
+        Self::new(Lexer::new(input))
+    }
+}
+
+impl<'a> From<&'a String> for Parser<'a> {
+    fn from(input: &'a String) -> Self {
+        Self::new(Lexer::new(&input))
+    }
 }
 
 impl<'a> Parser<'a> {
     pub fn new(lexer: Lexer<'a>) -> Self {
-        let mut p = Self {
+        Self {
             lexer,
-            token: Token::End,
-            peek_token: Token::End,
-        };
-        p.advance();
-        p.advance();
-        p
+            peeked: None,
+        }
     }
 
-    fn advance(&mut self) {
-        self.token = self.peek_token.clone();
-        self.peek_token = self.lexer.next();
+    fn token(&mut self) -> Token<'a> {
+        match self.peeked.take() {
+            Some(t) => t,
+            None => self.lexer.next_token(),
+        }
     }
 
-    pub fn parse_match_exp(&mut self) -> Result<'a, MatchExpression<'a>> {
+    fn peek_token(&mut self) -> &Token<'a> {
+        self.peeked.get_or_insert_with(|| self.lexer.next_token())
+    }
+
+    fn eat_token(&mut self) {
+        self.token();
+    }
+
+    pub(crate) fn parse_match_exp(&mut self) -> Result<'a, MatchExpression<'a>> {
         let mut expressions = vec![];
 
-        while self.token != Token::End {
-            let exp = match self.token {
-                Token::Literal(l) => AbstractMatchingExpression::Literal(self.parse_literal(l)),
-                Token::Ident(i) => self.parse_capture(i.clone())?,
-                Token::Arrow => {
-                    self.advance();
+        let mut token = self.token();
+
+        use TokenKind::*;
+
+        while token.kind != End {
+            if let Lparen = token.kind {
+                self.expect(Ident)?;
+            }
+
+            let exp = match token.kind {
+                Literal => AbstractMatchingExpression::Literal(&token.text),
+                Ident => {
+                    let exp = self.parse_capture(&token.text)?;
+                    self.expect(Rparen)?;
+                    exp
+                }
+                Arrow => {
+                    self.expect_not(End, Arrow)?;
                     break;
                 }
                 _ => {
-                    self.advance();
+                    token = self.token();
                     continue;
                 }
             };
 
             expressions.push(exp);
 
-            self.advance();
+            token = self.token();
         }
 
         Ok(MatchExpression::new(expressions))
     }
 
-    fn parse_literal(&mut self, first_char: char) -> String {
-        let mut lit = String::from(first_char);
-        while let Token::Literal(ch) = self.peek_token {
-            self.advance();
-            lit.push(ch)
-        }
-        lit
-    }
-
     fn parse_capture(&mut self, identifier: &'a str) -> Result<'a, AbstractMatchingExpression<'a>> {
-        self.advance();
+        self.eat_token();
 
-        self.expect(Token::DigitType)
-            .or(self.expect(Token::IntType))?;
+        self.expect(TokenKind::Type)?;
 
         Ok(AbstractMatchingExpression::Capture {
-            identifier: Token::Ident(identifier),
-
-            typing: self.token.clone(),
+            identifier,
+            identifier_type: match self.token() {
+                t if t.kind == TokenKind::Type => match *t.text {
+                    "int" => CaptureType::Int,
+                    "dig" => CaptureType::Digit,
+                    _ => {
+                        return Err(ParseError {
+                            input: self.lexer.input(),
+                            kind: ParseErrorKind::UnsupportedToken(t),
+                        })
+                    }
+                },
+                _ => unreachable!("we expected a type token"),
+            },
         })
     }
 
-    fn expect(&mut self, token: Token<'a>) -> Result<'a, ()> {
-        if self.peek_token != token {
-            return Err(ParseError::ExpectedToken {
-                expected: token,
-                found: self.peek_token.clone(),
-            });
-        }
+    fn expect(&mut self, token_kind: TokenKind) -> Result<'a, ()> {
+        let error_kind = match self.peek_token() {
+            t if t.kind == token_kind => return Ok(()),
+            t => ParseErrorKind::ExpectedToken {
+                expected: token_kind,
+                found: t.kind,
+                position: t.start,
+                text: &t.text,
+            },
+        };
 
-        self.advance();
-        Ok(())
+        Err(ParseError {
+            input: self.lexer.input(),
+            kind: error_kind,
+        })
     }
 
-    pub fn parse_replacement_exp(&mut self) -> Result<ReplaceExpression<'a>> {
+    fn expect_not(&mut self, token_kind: TokenKind, current: TokenKind) -> Result<'a, ()> {
+        let error_kind = match self.peek_token() {
+            t if t.kind == token_kind => ParseErrorKind::UnexpectedToken {
+                unexpected: token_kind,
+                previous: current,
+                position: t.start,
+            },
+            _ => return Ok(()),
+        };
+
+        Err(ParseError {
+            input: self.lexer.input(),
+            kind: error_kind,
+        })
+    }
+
+    pub(crate) fn parse_replacement_exp(
+        &mut self,
+        declared_idents: Vec<&'a str>,
+    ) -> Result<'a, ReplaceExpression<'a>> {
         let mut expressions = vec![];
 
-        while self.token != Token::End {
-            let exp = match &self.token {
-                Token::Literal(l) => AbstractReplaceExpression::Literal(self.parse_literal(*l)),
-                Token::Ident(i) => AbstractReplaceExpression::Identifier(i.clone()),
+        let mut token = self.token();
+
+        use TokenKind::*;
+        while token.kind != End {
+            if let Lparen = token.kind {
+                self.expect(Ident)?;
+            }
+
+            let exp = match &token.kind {
+                Literal => AbstractReplaceExpression::Literal(&token.text),
+                Ident => {
+                    if !declared_idents.contains(&token.text) {
+                        return Err(ParseError {
+                            input: self.lexer.input(),
+                            kind: ParseErrorKind::UndeclaredIdentifier {
+                                ident: &token.text,
+                                declared: declared_idents,
+                                position: token.start,
+                            },
+                        });
+                    }
+
+                    AbstractReplaceExpression::Identifier(&token.text)
+                }
                 _ => {
-                    self.advance();
+                    token = self.token();
                     continue;
                 }
             };
 
             expressions.push(exp);
 
-            self.advance();
+            token = self.token();
         }
 
         Ok(ReplaceExpression { expressions })
+    }
+
+    pub fn parse(&mut self) -> Result<'a, MatchAndReplaceExpression<'a>> {
+        let mex = self.parse_match_exp()?;
+        let declared_idents = mex
+            .expressions
+            .iter()
+            .filter_map(|e| match e {
+                AbstractMatchingExpression::Literal(_) => None,
+                AbstractMatchingExpression::Capture { identifier, .. } => Some(*identifier),
+            })
+            .collect();
+        let expression = MatchAndReplaceExpression {
+            rex: self.parse_replacement_exp(declared_idents)?,
+            mex,
+        };
+
+        Ok(expression)
     }
 }
 
@@ -160,7 +264,7 @@ mod tests {
 
         assert_eq!(
             p.parse_match_exp().unwrap(),
-            MatchExpression::new(vec![AbstractMatchingExpression::Literal("abc".to_string())])
+            MatchExpression::new(vec![AbstractMatchingExpression::Literal("abc")])
         );
 
         let input = "1234";
@@ -168,9 +272,7 @@ mod tests {
 
         assert_eq!(
             p.parse_match_exp().unwrap(),
-            MatchExpression::new(vec![AbstractMatchingExpression::Literal(
-                "1234".to_string()
-            )],)
+            MatchExpression::new(vec![AbstractMatchingExpression::Literal("1234")],)
         )
     }
 
@@ -182,9 +284,8 @@ mod tests {
         assert_eq!(
             p.parse_match_exp().unwrap(),
             MatchExpression::new(vec![AbstractMatchingExpression::Capture {
-                identifier: Token::Ident("num"),
-
-                typing: Token::IntType
+                identifier: "num",
+                identifier_type: CaptureType::Int
             }])
         );
     }
@@ -197,11 +298,10 @@ mod tests {
         assert_eq!(
             p.parse_match_exp().unwrap(),
             MatchExpression::new(vec![
-                AbstractMatchingExpression::Literal("abc".to_string()),
+                AbstractMatchingExpression::Literal("abc"),
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("d"),
-
-                    typing: Token::DigitType
+                    identifier: "d",
+                    identifier_type: CaptureType::Digit
                 }
             ])
         )
@@ -215,22 +315,22 @@ mod tests {
         assert_eq!(
             p.parse_match_exp().unwrap(),
             MatchExpression::new(vec![
-                AbstractMatchingExpression::Literal("abc235".to_string()),
+                AbstractMatchingExpression::Literal("abc235"),
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("d"),
+                    identifier: "d",
 
-                    typing: Token::DigitType
+                    identifier_type: CaptureType::Digit
                 },
-                AbstractMatchingExpression::Literal("zap".to_string()),
+                AbstractMatchingExpression::Literal("zap"),
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("num"),
+                    identifier: "num",
 
-                    typing: Token::IntType
+                    identifier_type: CaptureType::Int
                 },
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("d"),
+                    identifier: "d",
 
-                    typing: Token::IntType
+                    identifier_type: CaptureType::Int
                 },
             ])
         )
@@ -242,9 +342,14 @@ mod tests {
         let mut p = Parser::new(Lexer::new(input));
         assert_eq!(
             p.parse_match_exp().unwrap_err(),
-            ParseError::ExpectedToken {
-                expected: Token::IntType,
-                found: Token::Rparen
+            ParseError {
+                input,
+                kind: ParseErrorKind::ExpectedToken {
+                    expected: TokenKind::Type,
+                    found: TokenKind::Rparen,
+                    text: ")",
+                    position: 7
+                }
             }
         );
     }
@@ -258,19 +363,18 @@ mod tests {
             p.parse_match_exp().unwrap(),
             MatchExpression::new(vec![
                 AbstractMatchingExpression::Capture {
-                    identifier: Token::Ident("num"),
-
-                    typing: Token::IntType
+                    identifier: "num",
+                    identifier_type: CaptureType::Int
                 },
-                AbstractMatchingExpression::Literal("asdf".to_string()),
+                AbstractMatchingExpression::Literal("asdf"),
             ])
         );
 
         assert_eq!(
-            p.parse_replacement_exp().unwrap(),
+            p.parse_replacement_exp(vec!["num"]).unwrap(),
             ReplaceExpression {
                 expressions: vec![
-                    AbstractReplaceExpression::Literal("lul".to_string()),
+                    AbstractReplaceExpression::Literal("lul"),
                     AbstractReplaceExpression::Identifier("num")
                 ]
             }

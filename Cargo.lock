@@ -125,6 +125,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "colored"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3616f750b84d8f0de8a58bda93e08e2a81ad3f523089b05f1dffecab48c6cbd"
+dependencies = [
+ "atty",
+ "lazy_static",
+ "winapi",
+]
+
+[[package]]
 name = "criterion"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -317,8 +328,9 @@ dependencies = [
 
 [[package]]
 name = "mrp"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
+ "colored",
  "criterion",
  "regex",
 ]
@@ -471,7 +483,7 @@ checksum = "49b3de9ec5dc0a3417da371aab17d729997c15010e7fd24ff707773a33bddb64"
 
 [[package]]
 name = "rename"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap",
  "mrp",

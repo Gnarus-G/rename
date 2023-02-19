@@ -1,5 +1,7 @@
+use std::process::ExitCode;
+
 use clap::{Args, Parser, Subcommand};
-use mrp::{DefaultMatchAndReplaceStrategy, MatchAndReplaceExpression, MatchAndReplaceStrategy};
+use mrp::{DefaultMatchAndReplaceStrategy, MatchAndReplaceStrategy};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
@@ -25,13 +27,25 @@ enum Command {
     REGEX(RegexArgs),
 }
 
-fn main() {
+fn main() -> ExitCode {
     let base_args = RenameArgs::parse();
 
     match base_args.command {
         Command::REGEX(ref args) => handle_regex_replacement(&args, &base_args),
-        Command::SIMPLE(ref args) => handle_mrp_replacement(&args, &base_args),
-    }
+        Command::SIMPLE(ref args) => match mrp::parser::Parser::from(&args.expression).parse() {
+            Ok(ref e) => {
+                let mut replace = DefaultMatchAndReplaceStrategy::new(e);
+                replace.set_strip(args.strip);
+                handle_mrp_replacement(&base_args, replace);
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::FAILURE;
+            }
+        },
+    };
+
+    ExitCode::SUCCESS
 }
 
 #[derive(Debug, Args)]
@@ -43,12 +57,10 @@ struct SimpleArgs {
     strip: bool,
 }
 
-fn handle_mrp_replacement(args: &SimpleArgs, base_args: &RenameArgs) {
-    let exp = MatchAndReplaceExpression::from(args.expression.as_str());
-    let mut replace = DefaultMatchAndReplaceStrategy::new(&exp);
-
-    replace.set_strip(args.strip);
-
+fn handle_mrp_replacement<'e>(
+    base_args: &'e RenameArgs,
+    replace: DefaultMatchAndReplaceStrategy<'e>,
+) {
     base_args
         .paths
         .iter()

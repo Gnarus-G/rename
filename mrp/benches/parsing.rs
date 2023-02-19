@@ -1,18 +1,18 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use mrp::{
-    lexer::{Lexer, Token},
+    lexer::{Lexer, TokenKind},
     parser::Parser,
 };
 
-const EXPRESSION: &str = "aywer(n:dig)(num:int)asdf(lawerasdf:int)->lul(num)(n)asd(lasdkjf)(weoyr)";
+const EXPRESSION: &str = "aywer(n:dig)(num:int)asdf(lawerasdf:int)(lasdkjf:dig)et(weoyr:int)->lul(num)(n)asd(lasdkjf)(weoyr)";
 
 fn lexing_benchmark(c: &mut Criterion) {
     let mut lexer = Lexer::new(EXPRESSION);
     c.bench_function("lexing", |b| {
         b.iter(|| {
-            let mut t = lexer.next();
-            while t != Token::End {
-                t = lexer.next();
+            let mut t = lexer.next_token();
+            while t.kind != TokenKind::End {
+                t = lexer.next_token();
             }
         })
     });
@@ -23,8 +23,7 @@ fn parsing_benchmark(c: &mut Criterion) {
     let mut parser = Parser::new(lexer);
     c.bench_function("parsing", |b| {
         b.iter(|| {
-            parser.parse_match_exp().unwrap();
-            parser.parse_replacement_exp().unwrap()
+            parser.parse().unwrap();
         })
     });
 }

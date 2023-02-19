@@ -3,35 +3,14 @@ pub mod lexer;
 mod matcher;
 pub mod parser;
 
-use std::{borrow::Cow, str::FromStr};
+use std::borrow::Cow;
 
-use error::ParseError;
-use lexer::{Lexer, Token};
-use parser::{
-    AbstractMatchingExpression, AbstractReplaceExpression, MatchExpression, Parser,
-    ReplaceExpression,
-};
+use parser::{AbstractMatchingExpression, AbstractReplaceExpression, MatchAndReplaceExpression};
 
 /// Representing a stragety by which to match and replace on a `string` value
-pub trait MatchAndReplaceStrategy {
+pub trait MatchAndReplaceStrategy<'m> {
     /// Match and replace
-    fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>>;
-}
-
-#[derive(Debug, PartialEq)]
-pub struct MatchAndReplaceExpression<'a> {
-    mex: MatchExpression<'a>,
-    rex: ReplaceExpression<'a>,
-}
-
-impl<'a> From<&'a str> for MatchAndReplaceExpression<'a> {
-    fn from(value: &'a str) -> Self {
-        let mut p = Parser::new(Lexer::new(value));
-        MatchAndReplaceExpression {
-            mex: p.parse_match_exp().unwrap(),
-            rex: p.parse_replacement_exp().unwrap(),
-        }
-    }
+    fn apply<'sf, 's: 'sf + 'm>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>>;
 }
 
 pub struct DefaultMatchAndReplaceStrategy<'m> {
@@ -42,7 +21,7 @@ pub struct DefaultMatchAndReplaceStrategy<'m> {
 }
 
 impl<'m> DefaultMatchAndReplaceStrategy<'m> {
-    pub fn new(mrex: &'m MatchAndReplaceExpression) -> Self {
+    pub fn new(mrex: &'m MatchAndReplaceExpression<'m>) -> Self {
         Self { mrex, strip: false }
     }
 
@@ -51,8 +30,8 @@ impl<'m> DefaultMatchAndReplaceStrategy<'m> {
     }
 }
 
-impl<'m> MatchAndReplaceStrategy for DefaultMatchAndReplaceStrategy<'m> {
-    fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
+impl<'m> MatchAndReplaceStrategy<'m> for DefaultMatchAndReplaceStrategy<'m> {
+    fn apply<'sf, 's: 'sf + 'm>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
         match self.mrex.mex.find_at(value, 0) {
             None => None,
             Some(m) => {
@@ -63,12 +42,12 @@ impl<'m> MatchAndReplaceStrategy for DefaultMatchAndReplaceStrategy<'m> {
                     .expressions
                     .iter()
                     .map(|e| match e {
-                        AbstractReplaceExpression::Literal(l) => l.to_owned(),
+                        AbstractReplaceExpression::Literal(l) => *l,
                         AbstractReplaceExpression::Identifier(i) => self
                             .mrex
                             .mex
                             .get_capture(i)
-                            .expect("should have been captured"),
+                            .expect(&format!("'{i}' should have been captured")),
                     })
                     .collect();
 
@@ -97,17 +76,15 @@ impl RegexTranspilationStrategy {
             .expressions
             .iter()
             .filter_map(|e| match e {
-                AbstractMatchingExpression::Literal(l) => Some(l.clone()),
-                AbstractMatchingExpression::Capture { identifier, typing } => {
-                    if let Token::Ident(id) = identifier {
-                        return match typing {
-                            Token::DigitType => Some(format!("(?P<{id}>\\d)")),
-                            Token::IntType => Some(format!("(?P<{id}>\\d+)")),
-                            _ => None,
-                        };
+                AbstractMatchingExpression::Literal(l) => Some(l.to_string()),
+                AbstractMatchingExpression::Capture {
+                    identifier,
+                    identifier_type,
+                } => {
+                    return match identifier_type {
+                        parser::CaptureType::Digit => Some(format!("(?P<{}>\\d)", identifier)),
+                        parser::CaptureType::Int => Some(format!("(?P<{}>\\d+)", identifier)),
                     };
-
-                    None
                 }
             })
             .collect();
@@ -116,8 +93,8 @@ impl RegexTranspilationStrategy {
             .expressions
             .iter()
             .filter_map(|e| match e {
-                AbstractReplaceExpression::Literal(l) => Some(l.clone()),
-                AbstractReplaceExpression::Identifier(id) => Some(format!("${{{id}}}")),
+                AbstractReplaceExpression::Literal(l) => Some(l.to_string()),
+                AbstractReplaceExpression::Identifier(id) => Some(format!("${{{}}}", *id)),
             })
             .collect();
 
@@ -136,8 +113,8 @@ impl RegexTranspilationStrategy {
     }
 }
 
-impl MatchAndReplaceStrategy for RegexTranspilationStrategy {
-    fn apply<'sf, 's: 'sf>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
+impl<'m> MatchAndReplaceStrategy<'m> for RegexTranspilationStrategy {
+    fn apply<'sf, 's: 'sf + 'm>(&'sf self, value: &'s str) -> Option<std::borrow::Cow<str>> {
         let pattern = &self.regex;
 
         if !pattern.is_match(value) {
@@ -148,10 +125,15 @@ impl MatchAndReplaceStrategy for RegexTranspilationStrategy {
 }
 #[cfg(test)]
 mod tests {
+    use crate::parser::Parser;
+
     use super::*;
 
     impl<'m> DefaultMatchAndReplaceStrategy<'m> {
-        fn apply_all<'sf, 's: 'sf>(&'s self, values: Vec<&'s str>) -> Vec<std::borrow::Cow<str>> {
+        fn apply_all<'sf, 's: 'sf + 'm>(
+            &'s self,
+            values: Vec<&'s str>,
+        ) -> Vec<std::borrow::Cow<str>> {
             return values.iter().filter_map(|s| self.apply(s)).collect();
         }
     }
@@ -159,7 +141,7 @@ mod tests {
     #[test]
     fn one_literal_and_int_capture() {
         let input = "lit(num:int)->lul(num)";
-        let expression = MatchAndReplaceExpression::from(input);
+        let expression = Parser::from(input).parse().unwrap();
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         assert_eq!(strat.apply("lit12").unwrap(), "lul12");
@@ -168,14 +150,14 @@ mod tests {
     #[test]
     fn test_mrp_application() {
         let input = "(num:int)asdf->lul(num)";
-        let expression = MatchAndReplaceExpression::from(input);
+        let expression = Parser::from(input).parse().unwrap();
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         let treated = strat.apply_all(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
 
         assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
 
-        let expression = MatchAndReplaceExpression::from("hello(as:dig)->oh(as)hi");
+        let expression = Parser::from("hello(as:dig)->oh(as)hi").parse().unwrap();
 
         let strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
@@ -186,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_mrp_application_stripping() {
-        let expression = MatchAndReplaceExpression::from("hello(as:dig)->oh(as)hi");
+        let expression = Parser::from("hello(as:dig)->oh(as)hi").parse().unwrap();
         let mut strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         strat.set_strip(true);
@@ -198,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_mrp_application_with_multi_digits_and_stripping() {
-        let expression = MatchAndReplaceExpression::from("(n:int)->step(n)");
+        let expression = Parser::from("(n:int)->step(n)").parse().unwrap();
         let mut strat = DefaultMatchAndReplaceStrategy::new(&expression);
 
         strat.set_strip(true);
@@ -223,14 +205,13 @@ mod tests {
         #[test]
         fn test_mrp_application() {
             let input = "(num:int)asdf->lul(num)";
-            let expression =
-                RegexTranspilationStrategy::new(&MatchAndReplaceExpression::from(input));
+            let expression = RegexTranspilationStrategy::new(&Parser::from(input).parse().unwrap());
 
             let treated = expression.apply_all(vec!["124asdf", "3asdfwery", "lk234asdfas"]);
 
             assert_eq!(treated, vec!["lul124", "lul3wery", "lklul234as"]);
 
-            let expression = MatchAndReplaceExpression::from("hello(as:dig)->oh(as)hi");
+            let expression = Parser::from("hello(as:dig)->oh(as)hi").parse().unwrap();
 
             let strat = RegexTranspilationStrategy::new(&expression);
 
@@ -241,7 +222,7 @@ mod tests {
 
         #[test]
         fn test_mrp_application_stripping() {
-            let expression = MatchAndReplaceExpression::from("hello(as:dig)->oh(as)hi");
+            let expression = Parser::from("hello(as:dig)->oh(as)hi").parse().unwrap();
             let mut strat = RegexTranspilationStrategy::new(&expression);
 
             strat.make_pattern_strip_non_matched_parts();
@@ -253,7 +234,7 @@ mod tests {
 
         #[test]
         fn test_mrp_application_with_multi_digits_and_stripping() {
-            let expression = MatchAndReplaceExpression::from("(n:int)->step(n)");
+            let expression = Parser::from("(n:int)->step(n)").parse().unwrap();
             let mut strat = RegexTranspilationStrategy::new(&expression);
 
             strat.make_pattern_strip_non_matched_parts();
