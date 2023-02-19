@@ -20,6 +20,15 @@ pub enum AbstractMatchingExpression<'a> {
     },
 }
 
+impl<'a> AbstractMatchingExpression<'a> {
+    fn is_capture(&self) -> bool {
+        match self {
+            AbstractMatchingExpression::Literal(_) => false,
+            AbstractMatchingExpression::Capture { .. } => true,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum AbstractReplaceExpression<'a> {
     Literal(&'a str),
@@ -189,7 +198,10 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub(crate) fn parse_replacement_exp(&mut self) -> Result<'a, ReplaceExpression<'a>> {
+    pub(crate) fn parse_replacement_exp(
+        &mut self,
+        declared_idents: Vec<&'a str>,
+    ) -> Result<'a, ReplaceExpression<'a>> {
         let mut expressions = vec![];
 
         let mut token = self.token();
@@ -202,7 +214,20 @@ impl<'a> Parser<'a> {
 
             let exp = match &token.kind {
                 Literal => AbstractReplaceExpression::Literal(&token.text),
-                Ident => AbstractReplaceExpression::Identifier(&token.text),
+                Ident => {
+                    if !declared_idents.contains(&token.text) {
+                        return Err(ParseError {
+                            input: self.lexer.input(),
+                            kind: ParseErrorKind::UndeclaredIdentifier {
+                                ident: &token.text,
+                                declared: declared_idents,
+                                position: token.start,
+                            },
+                        });
+                    }
+
+                    AbstractReplaceExpression::Identifier(&token.text)
+                }
                 _ => {
                     token = self.token();
                     continue;
@@ -218,9 +243,18 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Result<'a, MatchAndReplaceExpression<'a>> {
+        let mex = self.parse_match_exp()?;
+        let declared_idents = mex
+            .expressions
+            .iter()
+            .filter_map(|e| match e {
+                AbstractMatchingExpression::Literal(_) => None,
+                AbstractMatchingExpression::Capture { identifier, .. } => Some(*identifier),
+            })
+            .collect();
         let expression = MatchAndReplaceExpression {
-            mex: self.parse_match_exp()?,
-            rex: self.parse_replacement_exp()?,
+            rex: self.parse_replacement_exp(declared_idents)?,
+            mex,
         };
 
         Ok(expression)
@@ -346,7 +380,7 @@ mod tests {
         );
 
         assert_eq!(
-            p.parse_replacement_exp().unwrap(),
+            p.parse_replacement_exp(vec!["num"]).unwrap(),
             ReplaceExpression {
                 expressions: vec![
                     AbstractReplaceExpression::Literal("lul"),

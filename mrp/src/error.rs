@@ -20,6 +20,11 @@ pub enum ParseErrorKind<'t> {
         previous: TokenKind,
         position: usize,
     },
+    UndeclaredIdentifier {
+        ident: &'t str,
+        declared: Vec<&'t str>,
+        position: usize,
+    },
 }
 
 impl Display for TokenKind {
@@ -46,9 +51,10 @@ pub struct ParseError<'t> {
 impl<'t> ParseError<'t> {
     fn error_location(&self) -> &usize {
         match &self.kind {
-            ParseErrorKind::ExpectedToken { position, .. } => &position,
             ParseErrorKind::UnsupportedToken(t) => &t.start,
+            ParseErrorKind::ExpectedToken { position, .. } => &position,
             ParseErrorKind::UnexpectedToken { position, .. } => &position,
+            ParseErrorKind::UndeclaredIdentifier { position, .. } => &position,
         }
     }
 }
@@ -119,6 +125,20 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                     "unexpected {}, after a {}",
                     unexpected.to_string().red(),
                     previous.to_string().blue()
+                )
+            }
+            UndeclaredIdentifier {
+                ident, declared, ..
+            } => {
+                write!(
+                    f,
+                    "undeclared identifier {}; declared: {}",
+                    ident.to_string().red(),
+                    declared
+                        .iter()
+                        .map(|i| i.blue().to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
                 )
             }
         }
@@ -221,6 +241,27 @@ mod tests {
                 unexpected: End,
                 previous: Arrow,
                 position: 8
+            }
+        );
+    }
+
+    #[test]
+    fn rejecting_undeclared_identifers() {
+        assert_error!(
+            "a->(n)",
+            UndeclaredIdentifier {
+                ident: "n",
+                declared: vec![],
+                position: 4
+            }
+        );
+
+        assert_error!(
+            "a(a:int)(ell:dig)->(n)",
+            UndeclaredIdentifier {
+                ident: "n",
+                declared: vec!["a", "ell"],
+                position: 20
             }
         );
     }
