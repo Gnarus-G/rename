@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use colored::Colorize;
+
 use crate::lexer::{Token, TokenKind};
 
 pub type Result<'s, T> = std::result::Result<T, ParseError<'s>>;
@@ -57,7 +59,7 @@ impl<'t> std::fmt::Display for ParseError<'t> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ParseErrorKind::*;
 
-        writeln!(f, "{}", self.input)?;
+        writeln!(f, "{}", self.input.yellow())?;
 
         let location = self.error_location();
 
@@ -65,7 +67,13 @@ impl<'t> std::fmt::Display for ParseError<'t> {
             write!(f, " ")?;
         }
 
-        write!(f, "\u{21B3} @col:{location} ")?;
+        write!(
+            f,
+            "{} {}:{} ",
+            "\u{21B3}".red().bold(),
+            "@col".red().bold(),
+            location.to_string().bold()
+        )?;
 
         match &self.kind {
             ExpectedToken {
@@ -74,13 +82,29 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                 text,
                 ..
             } => {
-                write!(f, "expected a {expected}, but found a {found}, \"{text}\"")
+                write!(
+                    f,
+                    "expected {}, but found a {}, {}",
+                    expected.to_string().blue(),
+                    found.to_string().red(),
+                    format!("\"{text}\"").yellow()
+                )
             }
             UnsupportedToken(t) => {
-                let result = write!(f, "unsupported token: {} '{}'", t.kind, t.text);
+                let result = write!(
+                    f,
+                    "unsupported token: {} {}",
+                    t.kind.to_string().red(),
+                    format!("\"{}\"", t.text).yellow()
+                );
 
                 if let TokenKind::Type = t.kind {
-                    return write!(f, " - supported types are: int, dig");
+                    return write!(
+                        f,
+                        " - supported types are: {}, {}",
+                        "int".purple(),
+                        "dig".purple()
+                    );
                 }
 
                 result
@@ -90,7 +114,12 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                 previous,
                 ..
             } => {
-                write!(f, "unexpected {unexpected}, after a {previous}")
+                write!(
+                    f,
+                    "unexpected {}, after a {}",
+                    unexpected.to_string().red(),
+                    previous.to_string().blue()
+                )
             }
         }
     }
