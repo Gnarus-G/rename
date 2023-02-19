@@ -115,7 +115,10 @@ impl<'a> Parser<'a> {
                     self.expect(Rparen)?;
                     exp
                 }
-                Arrow => break,
+                Arrow => {
+                    self.expect_not(End, Arrow)?;
+                    break;
+                }
                 _ => {
                     token = self.token();
                     continue;
@@ -162,6 +165,22 @@ impl<'a> Parser<'a> {
                 position: t.start,
                 text: &t.text,
             },
+        };
+
+        Err(ParseError {
+            input: self.lexer.input(),
+            kind: error_kind,
+        })
+    }
+
+    fn expect_not(&mut self, token_kind: TokenKind, current: TokenKind) -> Result<'a, ()> {
+        let error_kind = match self.peek_token() {
+            t if t.kind == token_kind => ParseErrorKind::UnexpectedToken {
+                unexpected: token_kind,
+                previous: current,
+                position: t.start,
+            },
+            _ => return Ok(()),
         };
 
         Err(ParseError {

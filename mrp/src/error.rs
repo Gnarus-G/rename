@@ -13,6 +13,11 @@ pub enum ParseErrorKind<'t> {
         position: usize,
     },
     UnsupportedToken(Token<'t>),
+    UnexpectedToken {
+        unexpected: TokenKind,
+        previous: TokenKind,
+        position: usize,
+    },
 }
 
 impl Display for TokenKind {
@@ -24,7 +29,7 @@ impl Display for TokenKind {
             Type => write!(f, "type keyword"),
             Ident => write!(f, "identifier"),
             Arrow => write!(f, "pattern seperator"),
-            End => write!(f, "\0"),
+            End => write!(f, "end of expression"),
             _ => write!(f, "special character"),
         };
     }
@@ -41,6 +46,7 @@ impl<'t> ParseError<'t> {
         match &self.kind {
             ParseErrorKind::ExpectedToken { position, .. } => &position,
             ParseErrorKind::UnsupportedToken(t) => &t.start,
+            ParseErrorKind::UnexpectedToken { position, .. } => &position,
         }
     }
 }
@@ -78,6 +84,13 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                 }
 
                 result
+            }
+            UnexpectedToken {
+                unexpected,
+                previous,
+                ..
+            } => {
+                write!(f, "unexpected {unexpected}, after a {previous}")
             }
         }
     }
@@ -157,6 +170,18 @@ mod tests {
                 found: Arrow,
                 text: "->",
                 position: 6
+            }
+        );
+    }
+
+    #[test]
+    fn expecting_replacement_exp_after_arrow() {
+        assert_error!(
+            "wer324->",
+            UnexpectedToken {
+                unexpected: End,
+                previous: Arrow,
+                position: 8
             }
         );
     }
