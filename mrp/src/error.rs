@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use colored::Colorize;
 
 use crate::lexer::{Token, TokenKind};
@@ -27,17 +25,17 @@ pub enum ParseErrorKind<'t> {
     },
 }
 
-impl Display for TokenKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl TokenKind {
+    fn description(&self) -> &str {
         use TokenKind::*;
 
         return match self {
-            Literal => write!(f, "literal"),
-            Type => write!(f, "type keyword"),
-            Ident => write!(f, "identifier"),
-            Arrow => write!(f, "pattern seperator"),
-            End => write!(f, "end of expression"),
-            _ => write!(f, "special character"),
+            Literal => "literal",
+            Type => "type keyword",
+            Ident => "identifier",
+            Arrow => "pattern seperator",
+            End => "end of expression",
+            _ => "special character",
         };
     }
 }
@@ -91,8 +89,8 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                 write!(
                     f,
                     "expected {}, but found a {}, {}",
-                    expected.to_string().blue(),
-                    found.to_string().red(),
+                    expected.description().blue(),
+                    found.description().red(),
                     format!("\"{text}\"").yellow()
                 )
             }
@@ -100,7 +98,7 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                 let result = write!(
                     f,
                     "unsupported token: {} {}",
-                    t.kind.to_string().red(),
+                    t.kind.description().red(),
                     format!("\"{}\"", t.text).yellow()
                 );
 
@@ -123,8 +121,8 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                 write!(
                     f,
                     "unexpected {}, after a {}",
-                    unexpected.to_string().red(),
-                    previous.to_string().blue()
+                    unexpected.description().red(),
+                    previous.description().blue()
                 )
             }
             UndeclaredIdentifier {
