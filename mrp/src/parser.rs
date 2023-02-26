@@ -79,6 +79,29 @@ impl<'a> MatchExpression<'a> {
             .get(&CaptureName::Identifier(name))
             .map(|s| *s)
     }
+
+    fn number_of_unamed_captures(&self) -> usize {
+        self.expressions
+            .iter()
+            .filter_map(|e| match e {
+                AbstractMatchingExpression::Literal(_) => None,
+                AbstractMatchingExpression::Capture { identifier, .. } => match identifier {
+                    Some(_) => None,
+                    None => Some(()),
+                },
+            })
+            .count()
+    }
+
+    fn declared_caputure_identifiers(&self) -> Vec<&'a str> {
+        self.expressions
+            .iter()
+            .filter_map(|e| match e {
+                AbstractMatchingExpression::Literal(_) => None,
+                AbstractMatchingExpression::Capture { identifier, .. } => *identifier,
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -257,9 +280,11 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn parse_replacement_exp(
         &mut self,
-        declared_idents: Vec<&'a str>,
+        match_exp: &MatchExpression<'a>,
     ) -> Result<'a, ReplaceExpression<'a>> {
         let mut expressions = vec![];
+        let declared_identifiers = match_exp.declared_caputure_identifiers();
+        let number_unamed_captures = match_exp.number_of_unamed_captures();
 
         let mut token = self.token();
 
@@ -272,16 +297,31 @@ impl<'a> Parser<'a> {
             let exp = match &token.kind {
                 Literal => AbstractReplaceExpression::Literal(&token.text),
                 CaptureIndex => {
-                    let idx = &token.text;
-                    AbstractReplaceExpression::CaptureIndex(idx.parse().unwrap())
+                    let idx_str = &token.text;
+                    let idx = idx_str
+                        .parse()
+                        .expect("capture index should be a number for sure");
+
+                    if number_unamed_captures < idx {
+                        return Err(ParseError {
+                            input: self.lexer.input(),
+                            kind: ParseErrorKind::OutOfBoundsCaptureIndex {
+                                index: idx_str,
+                                number_of_ordinal_captures: number_unamed_captures,
+                                position: token.start,
+                            },
+                        });
+                    }
+
+                    AbstractReplaceExpression::CaptureIndex(idx)
                 }
                 Ident => {
-                    if !declared_idents.contains(&token.text) {
+                    if !declared_identifiers.contains(&token.text) {
                         return Err(ParseError {
                             input: self.lexer.input(),
                             kind: ParseErrorKind::UndeclaredIdentifier {
                                 ident: &token.text,
-                                declared: declared_idents,
+                                declared: declared_identifiers,
                                 position: token.start,
                             },
                         });
@@ -305,16 +345,8 @@ impl<'a> Parser<'a> {
 
     pub fn parse(&mut self) -> Result<'a, MatchAndReplaceExpression<'a>> {
         let mex = self.parse_match_exp()?;
-        let declared_idents = mex
-            .expressions
-            .iter()
-            .filter_map(|e| match e {
-                AbstractMatchingExpression::Literal(_) => None,
-                AbstractMatchingExpression::Capture { identifier, .. } => *identifier,
-            })
-            .collect();
         let expression = MatchAndReplaceExpression {
-            rex: self.parse_replacement_exp(declared_idents)?,
+            rex: self.parse_replacement_exp(&mex)?,
             mex,
         };
 
@@ -429,19 +461,18 @@ mod tests {
         let input = "(num:int)asdf->lul(num)";
         let mut p = Parser::new(Lexer::new(input));
 
-        assert_eq!(
-            p.parse_match_exp().unwrap(),
-            MatchExpression::new(vec![
-                AbstractMatchingExpression::Capture {
-                    identifier: Some("num"),
-                    identifier_type: CaptureType::Int
-                },
-                AbstractMatchingExpression::Literal("asdf"),
-            ])
-        );
+        let m_exp = MatchExpression::new(vec![
+            AbstractMatchingExpression::Capture {
+                identifier: Some("num"),
+                identifier_type: CaptureType::Int,
+            },
+            AbstractMatchingExpression::Literal("asdf"),
+        ]);
+
+        assert_eq!(p.parse_match_exp().unwrap(), m_exp);
 
         assert_eq!(
-            p.parse_replacement_exp(vec!["num"]).unwrap(),
+            p.parse_replacement_exp(&m_exp).unwrap(),
             ReplaceExpression {
                 expressions: vec![
                     AbstractReplaceExpression::Literal("lul"),
@@ -456,23 +487,22 @@ mod tests {
         let input = "(int)asdf(dig)->lul(1)(2)";
         let mut p = Parser::new(Lexer::new(input));
 
-        assert_eq!(
-            p.parse_match_exp().unwrap(),
-            MatchExpression::new(vec![
-                AbstractMatchingExpression::Capture {
-                    identifier: None,
-                    identifier_type: CaptureType::Int
-                },
-                AbstractMatchingExpression::Literal("asdf"),
-                AbstractMatchingExpression::Capture {
-                    identifier: None,
-                    identifier_type: CaptureType::Digit
-                },
-            ])
-        );
+        let m_exp = MatchExpression::new(vec![
+            AbstractMatchingExpression::Capture {
+                identifier: None,
+                identifier_type: CaptureType::Int,
+            },
+            AbstractMatchingExpression::Literal("asdf"),
+            AbstractMatchingExpression::Capture {
+                identifier: None,
+                identifier_type: CaptureType::Digit,
+            },
+        ]);
+
+        assert_eq!(p.parse_match_exp().unwrap(), m_exp);
 
         assert_eq!(
-            p.parse_replacement_exp(vec![]).unwrap(),
+            p.parse_replacement_exp(&m_exp).unwrap(),
             ReplaceExpression {
                 expressions: vec![
                     AbstractReplaceExpression::Literal("lul"),

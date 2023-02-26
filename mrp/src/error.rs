@@ -18,6 +18,11 @@ pub enum ParseErrorKind<'t> {
         previous: TokenKind,
         position: usize,
     },
+    OutOfBoundsCaptureIndex {
+        index: &'t str,
+        number_of_ordinal_captures: usize,
+        position: usize,
+    },
     UndeclaredIdentifier {
         ident: &'t str,
         declared: Vec<&'t str>,
@@ -53,6 +58,7 @@ impl<'t> ParseError<'t> {
             ParseErrorKind::ExpectedToken { position, .. } => &position,
             ParseErrorKind::UnexpectedToken { position, .. } => &position,
             ParseErrorKind::UndeclaredIdentifier { position, .. } => &position,
+            ParseErrorKind::OutOfBoundsCaptureIndex { position, .. } => &position,
         }
     }
 }
@@ -143,6 +149,16 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                         .join(", ")
                 )
             }
+            OutOfBoundsCaptureIndex {
+                index,
+                number_of_ordinal_captures,
+                ..
+            } => write!(
+                f,
+                "out of bounds capture index {}; only {} unamed capture group(s) declared",
+                index.to_string().red(),
+                number_of_ordinal_captures.to_string().blue(),
+            ),
         }
     }
 }
@@ -264,6 +280,27 @@ mod tests {
                 ident: "n",
                 declared: vec!["a", "ell"],
                 position: 20
+            }
+        );
+    }
+
+    #[test]
+    fn rejecting_out_of_bounds_capture_index() {
+        assert_error!(
+            "a->(1)",
+            OutOfBoundsCaptureIndex {
+                index: "1",
+                number_of_ordinal_captures: 0,
+                position: 4
+            }
+        );
+
+        assert_error!(
+            "a(int)(dig)->(3)",
+            OutOfBoundsCaptureIndex {
+                index: "3",
+                number_of_ordinal_captures: 2,
+                position: 14
             }
         );
     }
