@@ -7,7 +7,7 @@ pub type Result<'s, T> = std::result::Result<T, ParseError<'s>>;
 #[derive(Debug, PartialEq)]
 pub enum ParseErrorKind<'t> {
     ExpectedToken {
-        expected: TokenKind,
+        expected: &'static [TokenKind],
         found: TokenKind,
         text: &'t str,
         position: usize,
@@ -89,7 +89,11 @@ impl<'t> std::fmt::Display for ParseError<'t> {
                 write!(
                     f,
                     "expected {}, but found a {}, {}",
-                    expected.description().blue(),
+                    expected
+                        .iter()
+                        .map(|e| e.description().blue().to_string())
+                        .collect::<Vec<String>>()
+                        .join(", or "),
                     found.description().red(),
                     format!("\"{text}\"").yellow()
                 )
@@ -170,7 +174,7 @@ mod tests {
         assert_error!(
             "a(:int)",
             ParseErrorKind::ExpectedToken {
-                expected: TokenKind::Ident,
+                expected: &[TokenKind::Ident, TokenKind::Type],
                 found: TokenKind::Colon,
                 text: ":",
                 position: 2
@@ -180,7 +184,7 @@ mod tests {
         assert_error!(
             "a(n:int)->(",
             ParseErrorKind::ExpectedToken {
-                expected: TokenKind::Ident,
+                expected: &[TokenKind::Ident, TokenKind::CaptureIndex],
                 found: TokenKind::End,
                 text: "",
                 position: 11
@@ -190,7 +194,7 @@ mod tests {
         assert_error!(
             "a(n:int)->()",
             ParseErrorKind::ExpectedToken {
-                expected: TokenKind::Ident,
+                expected: &[Ident, CaptureIndex],
                 found: TokenKind::Rparen,
                 text: ")",
                 position: 11
@@ -203,7 +207,7 @@ mod tests {
         assert_error!(
             "(n:int",
             ExpectedToken {
-                expected: Rparen,
+                expected: &[Rparen],
                 found: End,
                 text: "",
                 position: 6
@@ -213,7 +217,7 @@ mod tests {
         assert_error!(
             "(n:int ",
             ExpectedToken {
-                expected: Rparen,
+                expected: &[Rparen],
                 found: Literal,
                 text: " ",
                 position: 6
@@ -223,7 +227,7 @@ mod tests {
         assert_error!(
             "(n:int->(n)",
             ExpectedToken {
-                expected: Rparen,
+                expected: &[Rparen],
                 found: Arrow,
                 text: "->",
                 position: 6
@@ -269,7 +273,7 @@ mod tests {
         assert_error!(
             "t(n:)8",
             super::ParseErrorKind::ExpectedToken {
-                expected: TokenKind::Type,
+                expected: &[TokenKind::Type],
                 found: TokenKind::Rparen,
                 text: ")",
                 position: 4

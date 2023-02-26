@@ -1,4 +1,7 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+};
 
 use crate::{
     error::{ParseError, ParseErrorKind, Result},
@@ -15,7 +18,7 @@ pub enum CaptureType {
 pub enum AbstractMatchingExpression<'a> {
     Literal(&'a str),
     Capture {
-        identifier: &'a str,
+        identifier: Option<&'a str>,
         identifier_type: CaptureType,
     },
 }
@@ -24,12 +27,20 @@ pub enum AbstractMatchingExpression<'a> {
 pub enum AbstractReplaceExpression<'a> {
     Literal(&'a str),
     Identifier(&'a str),
+    CaptureIndex(usize),
+}
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub enum CaptureName<'a> {
+    Ordinal(usize),
+    Identifier(&'a str),
 }
 
 #[derive(Debug, PartialEq)]
 pub struct MatchExpression<'a> {
     pub expressions: Vec<AbstractMatchingExpression<'a>>,
-    pub captures: RefCell<HashMap<&'a str, &'a str>>,
+    captures: RefCell<HashMap<CaptureName<'a>, &'a str>>,
+    curr_capture_index: Cell<usize>,
 }
 
 impl<'a> MatchExpression<'a> {
@@ -37,11 +48,36 @@ impl<'a> MatchExpression<'a> {
         Self {
             expressions,
             captures: RefCell::new(HashMap::new()),
+            curr_capture_index: Cell::new(1),
         }
     }
 
+    pub fn add_ordinal_capture(&self, value: &'a str) {
+        self.captures
+            .borrow_mut()
+            .insert(CaptureName::Ordinal(self.curr_capture_index.get()), value);
+        let bumped_index = self.curr_capture_index.get() + 1;
+        self.curr_capture_index.set(bumped_index);
+    }
+
+    pub fn add_named_capture(&self, ident: &'a str, value: &'a str) {
+        self.captures
+            .borrow_mut()
+            .insert(CaptureName::Identifier(ident), value);
+    }
+
+    pub fn get_capture_index(&self, index: usize) -> Option<&str> {
+        self.captures
+            .borrow()
+            .get(&CaptureName::Ordinal(index))
+            .map(|s| *s)
+    }
+
     pub fn get_capture(&self, name: &str) -> Option<&str> {
-        self.captures.borrow().get(name).map(|s| *s)
+        self.captures
+            .borrow()
+            .get(&CaptureName::Identifier(name))
+            .map(|s| *s)
     }
 }
 
@@ -105,14 +141,19 @@ impl<'a> Parser<'a> {
 
         while token.kind != End {
             if let Lparen = token.kind {
-                self.expect(Ident)?;
+                self.expect(&[Ident, Type])?;
             }
 
             let exp = match token.kind {
                 Literal => AbstractMatchingExpression::Literal(&token.text),
+                Type => {
+                    let exp = self.parse_capture_indexed(token)?;
+                    self.expect(&[Rparen])?;
+                    exp
+                }
                 Ident => {
-                    let exp = self.parse_capture(&token.text)?;
-                    self.expect(Rparen)?;
+                    let exp = self.parse_capture_identifier(&token.text)?;
+                    self.expect(&[Rparen])?;
                     exp
                 }
                 Arrow => {
@@ -133,13 +174,38 @@ impl<'a> Parser<'a> {
         Ok(MatchExpression::new(expressions))
     }
 
-    fn parse_capture(&mut self, identifier: &'a str) -> Result<'a, AbstractMatchingExpression<'a>> {
+    fn parse_capture_indexed(
+        &mut self,
+        token: Token<'a>,
+    ) -> Result<'a, AbstractMatchingExpression<'a>> {
+        Ok(AbstractMatchingExpression::Capture {
+            identifier: None,
+            identifier_type: match token {
+                t if t.kind == TokenKind::Type => match *t.text {
+                    "int" => CaptureType::Int,
+                    "dig" => CaptureType::Digit,
+                    _ => {
+                        return Err(ParseError {
+                            input: self.lexer.input(),
+                            kind: ParseErrorKind::UnsupportedToken(t),
+                        })
+                    }
+                },
+                _ => unreachable!("we expected a type token"),
+            },
+        })
+    }
+
+    fn parse_capture_identifier(
+        &mut self,
+        identifier: &'a str,
+    ) -> Result<'a, AbstractMatchingExpression<'a>> {
         self.eat_token();
 
-        self.expect(TokenKind::Type)?;
+        self.expect(&[TokenKind::Type])?;
 
         Ok(AbstractMatchingExpression::Capture {
-            identifier,
+            identifier: Some(identifier),
             identifier_type: match self.token() {
                 t if t.kind == TokenKind::Type => match *t.text {
                     "int" => CaptureType::Int,
@@ -156,11 +222,11 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn expect(&mut self, token_kind: TokenKind) -> Result<'a, ()> {
+    fn expect(&mut self, token_kinds: &'static [TokenKind]) -> Result<'a, ()> {
         let error_kind = match self.peek_token() {
-            t if t.kind == token_kind => return Ok(()),
+            t if token_kinds.contains(&t.kind) => return Ok(()),
             t => ParseErrorKind::ExpectedToken {
-                expected: token_kind,
+                expected: token_kinds,
                 found: t.kind,
                 position: t.start,
                 text: &t.text,
@@ -200,11 +266,15 @@ impl<'a> Parser<'a> {
         use TokenKind::*;
         while token.kind != End {
             if let Lparen = token.kind {
-                self.expect(Ident)?;
+                self.expect(&[Ident, CaptureIndex])?;
             }
 
             let exp = match &token.kind {
                 Literal => AbstractReplaceExpression::Literal(&token.text),
+                CaptureIndex => {
+                    let idx = &token.text;
+                    AbstractReplaceExpression::CaptureIndex(idx.parse().unwrap())
+                }
                 Ident => {
                     if !declared_idents.contains(&token.text) {
                         return Err(ParseError {
@@ -240,7 +310,7 @@ impl<'a> Parser<'a> {
             .iter()
             .filter_map(|e| match e {
                 AbstractMatchingExpression::Literal(_) => None,
-                AbstractMatchingExpression::Capture { identifier, .. } => Some(*identifier),
+                AbstractMatchingExpression::Capture { identifier, .. } => *identifier,
             })
             .collect();
         let expression = MatchAndReplaceExpression {
@@ -284,7 +354,7 @@ mod tests {
         assert_eq!(
             p.parse_match_exp().unwrap(),
             MatchExpression::new(vec![AbstractMatchingExpression::Capture {
-                identifier: "num",
+                identifier: Some("num"),
                 identifier_type: CaptureType::Int
             }])
         );
@@ -300,7 +370,7 @@ mod tests {
             MatchExpression::new(vec![
                 AbstractMatchingExpression::Literal("abc"),
                 AbstractMatchingExpression::Capture {
-                    identifier: "d",
+                    identifier: Some("d"),
                     identifier_type: CaptureType::Digit
                 }
             ])
@@ -317,18 +387,18 @@ mod tests {
             MatchExpression::new(vec![
                 AbstractMatchingExpression::Literal("abc235"),
                 AbstractMatchingExpression::Capture {
-                    identifier: "d",
+                    identifier: Some("d"),
 
                     identifier_type: CaptureType::Digit
                 },
                 AbstractMatchingExpression::Literal("zap"),
                 AbstractMatchingExpression::Capture {
-                    identifier: "num",
+                    identifier: Some("num"),
 
                     identifier_type: CaptureType::Int
                 },
                 AbstractMatchingExpression::Capture {
-                    identifier: "d",
+                    identifier: Some("d"),
 
                     identifier_type: CaptureType::Int
                 },
@@ -345,7 +415,7 @@ mod tests {
             ParseError {
                 input,
                 kind: ParseErrorKind::ExpectedToken {
-                    expected: TokenKind::Type,
+                    expected: &[TokenKind::Type],
                     found: TokenKind::Rparen,
                     text: ")",
                     position: 7
@@ -363,7 +433,7 @@ mod tests {
             p.parse_match_exp().unwrap(),
             MatchExpression::new(vec![
                 AbstractMatchingExpression::Capture {
-                    identifier: "num",
+                    identifier: Some("num"),
                     identifier_type: CaptureType::Int
                 },
                 AbstractMatchingExpression::Literal("asdf"),
@@ -376,6 +446,38 @@ mod tests {
                 expressions: vec![
                     AbstractReplaceExpression::Literal("lul"),
                     AbstractReplaceExpression::Identifier("num")
+                ]
+            }
+        )
+    }
+
+    #[test]
+    fn unnamed_positional_capture_groups() {
+        let input = "(int)asdf(dig)->lul(1)(2)";
+        let mut p = Parser::new(Lexer::new(input));
+
+        assert_eq!(
+            p.parse_match_exp().unwrap(),
+            MatchExpression::new(vec![
+                AbstractMatchingExpression::Capture {
+                    identifier: None,
+                    identifier_type: CaptureType::Int
+                },
+                AbstractMatchingExpression::Literal("asdf"),
+                AbstractMatchingExpression::Capture {
+                    identifier: None,
+                    identifier_type: CaptureType::Digit
+                },
+            ])
+        );
+
+        assert_eq!(
+            p.parse_replacement_exp(vec![]).unwrap(),
+            ReplaceExpression {
+                expressions: vec![
+                    AbstractReplaceExpression::Literal("lul"),
+                    AbstractReplaceExpression::CaptureIndex(1),
+                    AbstractReplaceExpression::CaptureIndex(2)
                 ]
             }
         )

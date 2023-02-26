@@ -10,6 +10,7 @@ pub enum TokenKind {
     Rparen,
     Type,
     Ident,
+    CaptureIndex,
     Colon,
     Arrow,
     End,
@@ -51,6 +52,22 @@ impl<'t> Display for TokenText<'t> {
                 TokenText::Empty => "",
             }
         )
+    }
+}
+
+trait IsNumber {
+    fn is_numeric(&self) -> bool;
+}
+
+impl IsNumber for &str {
+    fn is_numeric(&self) -> bool {
+        for c in self.bytes() {
+            if !c.is_ascii_digit() {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 
@@ -150,7 +167,7 @@ impl<'a> Lexer<'a> {
                 }
                 b':' => self.char_token(TokenKind::Colon),
                 _ if self.if_previous(b':') => self.type_token(),
-                _ if self.if_previous(b'(') => self.identifier_token(),
+                _ if self.if_previous(b'(') => self.identifier_token_or_type(),
                 _ => self.literal(),
             },
             None => Token {
@@ -176,15 +193,27 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn identifier_token(&mut self) -> Token<'a> {
+    fn identifier_token_or_type(&mut self) -> Token<'a> {
         let start = self.position;
         let (s, e) = self.read_while(|c| c.is_ascii_alphabetic());
         let slice = self.input_slice(s..e);
 
-        Token {
-            kind: TokenKind::Ident,
-            text: TokenText::Slice(slice),
-            start,
+        match slice {
+            "int" | "dig" => Token {
+                kind: TokenKind::Type,
+                text: TokenText::Slice(slice),
+                start,
+            },
+            s if s.is_numeric() => Token {
+                kind: TokenKind::CaptureIndex,
+                text: TokenText::Slice(slice),
+                start,
+            },
+            _ => Token {
+                kind: TokenKind::Ident,
+                text: TokenText::Slice(slice),
+                start,
+            },
         }
     }
 
@@ -316,5 +345,14 @@ mod tests {
         assert_eq!(l.next_token(), token_string(Ident, "n", 11));
         assert_eq!(l.next_token(), token(Rparen, 12));
         assert_eq!(l.next_token(), token_string(Literal, "b", 13));
+    }
+
+    #[test]
+    fn type_in_positional_capture() {
+        let mut l = Lexer::new("a(dig)->b");
+
+        assert_eq!(l.next_token(), token_string(Literal, "a", 0));
+        assert_eq!(l.next_token(), token(Lparen, 1));
+        assert_eq!(l.next_token(), token_string(Type, "dig", 2));
     }
 }

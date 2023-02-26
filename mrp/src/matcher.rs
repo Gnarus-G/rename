@@ -21,8 +21,6 @@ impl<'a> MatchExpression<'a> {
         let mut capture_slice_start = None;
         let mut capture_candidate_found = None;
 
-        let mut captures_map = self.captures.borrow_mut();
-
         while state < self.expressions.len() && curr_position < input.len() {
             let e = self.expressions.get(state).unwrap();
 
@@ -64,7 +62,13 @@ impl<'a> MatchExpression<'a> {
                         if ch.is_ascii_digit() {
                             curr_position += 1;
                             state += 1;
-                            captures_map.insert(identifier.as_ref(), ch_str);
+
+                            match identifier {
+                                Some(id) => self.add_named_capture(id, ch_str),
+                                None => self.add_ordinal_capture(ch_str),
+                            }
+
+                            // captures_map.insert(Ca, ch_str);
                         } else {
                             curr_position += 1;
                             state = 0;
@@ -73,8 +77,12 @@ impl<'a> MatchExpression<'a> {
                     CaptureType::Int => {
                         let ch = input.as_bytes()[curr_position] as char;
 
-                        let mut capture = |start: usize, curr_position: usize| {
-                            captures_map.insert(identifier.as_ref(), &input[start..curr_position]);
+                        let capture = |start: usize, curr_position: usize| {
+                            let value = &input[start..curr_position];
+                            match identifier {
+                                Some(id) => self.add_named_capture(id, value),
+                                None => self.add_ordinal_capture(value),
+                            }
                         };
 
                         if ch.is_ascii_digit() {

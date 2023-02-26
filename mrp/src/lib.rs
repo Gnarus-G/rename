@@ -48,6 +48,11 @@ impl<'m> MatchAndReplaceStrategy<'m> for MatchAndReplacer<'m> {
                             .mex
                             .get_capture(i)
                             .expect(&format!("'{i}' should have been captured")),
+                        AbstractReplaceExpression::CaptureIndex(idx) => self
+                            .mrex
+                            .mex
+                            .get_capture_index(*idx)
+                            .expect(&format!("index '{idx}' should have been captured")),
                     })
                     .collect();
 
