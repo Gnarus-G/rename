@@ -131,7 +131,7 @@ impl<'t> Display for ParseErrorKind<'t> {
             } => {
                 write!(
                     f,
-                    "expected a {}, but found a {}, {}",
+                    "expected: {}; found a {}, {}",
                     expected
                         .iter()
                         .map(|e| e.description().blue().to_string())
