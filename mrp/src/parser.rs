@@ -163,11 +163,12 @@ impl<'a> Parser<'a> {
         use TokenKind::*;
 
         while token.kind != End {
-            if let Lparen = token.kind {
-                self.expect(&[Ident, Type])?;
-            }
-
             let exp = match token.kind {
+                Lparen => {
+                    self.expect(&[Ident, Type])?;
+                    token = self.token();
+                    continue;
+                }
                 Literal => AbstractMatchingExpression::Literal(&token.text),
                 Type => {
                     let exp = self.parse_capture_indexed(token)?;
@@ -175,6 +176,13 @@ impl<'a> Parser<'a> {
                     exp
                 }
                 Ident => {
+                    if let Err(e) = self.expect(&[Colon]) {
+                        return Err(e.and(ParseErrorKind::UnsupportedToken(Token {
+                            kind: Type,
+                            text: token.text,
+                            start: token.start,
+                        })));
+                    };
                     let exp = self.parse_capture_identifier(&token.text)?;
                     self.expect(&[Rparen])?;
                     exp
@@ -208,10 +216,10 @@ impl<'a> Parser<'a> {
                     "int" => CaptureType::Int,
                     "dig" => CaptureType::Digit,
                     _ => {
-                        return Err(ParseError {
-                            input: self.lexer.input(),
-                            kind: ParseErrorKind::UnsupportedToken(t),
-                        })
+                        return Err(ParseError::new(
+                            self.lexer.input(),
+                            ParseErrorKind::UnsupportedToken(t),
+                        ))
                     }
                 },
                 _ => unreachable!("we expected a type token"),
@@ -234,10 +242,10 @@ impl<'a> Parser<'a> {
                     "int" => CaptureType::Int,
                     "dig" => CaptureType::Digit,
                     _ => {
-                        return Err(ParseError {
-                            input: self.lexer.input(),
-                            kind: ParseErrorKind::UnsupportedToken(t),
-                        })
+                        return Err(ParseError::new(
+                            self.lexer.input(),
+                            ParseErrorKind::UnsupportedToken(t),
+                        ))
                     }
                 },
                 _ => unreachable!("we expected a type token"),
@@ -256,10 +264,7 @@ impl<'a> Parser<'a> {
             },
         };
 
-        Err(ParseError {
-            input: self.lexer.input(),
-            kind: error_kind,
-        })
+        Err(ParseError::new(self.lexer.input(), error_kind))
     }
 
     fn expect_not(&mut self, token_kind: TokenKind, current: TokenKind) -> Result<'a, ()> {
@@ -272,10 +277,7 @@ impl<'a> Parser<'a> {
             _ => return Ok(()),
         };
 
-        Err(ParseError {
-            input: self.lexer.input(),
-            kind: error_kind,
-        })
+        Err(ParseError::new(self.lexer.input(), error_kind))
     }
 
     pub(crate) fn parse_replacement_exp(
@@ -303,28 +305,28 @@ impl<'a> Parser<'a> {
                         .expect("capture index should be a number for sure");
 
                     if number_unamed_captures < idx {
-                        return Err(ParseError {
-                            input: self.lexer.input(),
-                            kind: ParseErrorKind::OutOfBoundsCaptureIndex {
+                        return Err(ParseError::new(
+                            self.lexer.input(),
+                            ParseErrorKind::OutOfBoundsCaptureIndex {
                                 index: idx_str,
                                 number_of_ordinal_captures: number_unamed_captures,
                                 position: token.start,
                             },
-                        });
+                        ));
                     }
 
                     AbstractReplaceExpression::CaptureIndex(idx)
                 }
                 Ident => {
                     if !declared_identifiers.contains(&token.text) {
-                        return Err(ParseError {
-                            input: self.lexer.input(),
-                            kind: ParseErrorKind::UndeclaredIdentifier {
+                        return Err(ParseError::new(
+                            self.lexer.input(),
+                            ParseErrorKind::UndeclaredIdentifier {
                                 ident: &token.text,
                                 declared: declared_identifiers,
                                 position: token.start,
                             },
-                        });
+                        ));
                     }
 
                     AbstractReplaceExpression::Identifier(&token.text)
@@ -444,15 +446,15 @@ mod tests {
         let mut p = Parser::new(Lexer::new(input));
         assert_eq!(
             p.parse_match_exp().unwrap_err(),
-            ParseError {
+            ParseError::new(
                 input,
-                kind: ParseErrorKind::ExpectedToken {
+                ParseErrorKind::ExpectedToken {
                     expected: &[TokenKind::Type],
                     found: TokenKind::Rparen,
                     text: ")",
                     position: 7
                 }
-            }
+            )
         );
     }
 

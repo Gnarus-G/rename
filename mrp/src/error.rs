@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use colored::Colorize;
 
 use crate::lexer::{Token, TokenKind};
@@ -30,6 +32,18 @@ pub enum ParseErrorKind<'t> {
     },
 }
 
+impl<'t> ParseErrorKind<'t> {
+    fn error_location(&self) -> &usize {
+        match &self {
+            ParseErrorKind::UnsupportedToken(t) => &t.start,
+            ParseErrorKind::ExpectedToken { position, .. } => &position,
+            ParseErrorKind::UnexpectedToken { position, .. } => &position,
+            ParseErrorKind::UndeclaredIdentifier { position, .. } => &position,
+            ParseErrorKind::OutOfBoundsCaptureIndex { position, .. } => &position,
+        }
+    }
+}
+
 impl TokenKind {
     fn description(&self) -> &str {
         use TokenKind::*;
@@ -47,19 +61,27 @@ impl TokenKind {
 
 #[derive(Debug, PartialEq)]
 pub struct ParseError<'t> {
-    pub(crate) input: &'t str,
-    pub(crate) kind: ParseErrorKind<'t>,
+    input: &'t str,
+    kind: ParseErrorKind<'t>,
+    more: Vec<ParseErrorKind<'t>>,
 }
 
 impl<'t> ParseError<'t> {
-    fn error_location(&self) -> &usize {
-        match &self.kind {
-            ParseErrorKind::UnsupportedToken(t) => &t.start,
-            ParseErrorKind::ExpectedToken { position, .. } => &position,
-            ParseErrorKind::UnexpectedToken { position, .. } => &position,
-            ParseErrorKind::UndeclaredIdentifier { position, .. } => &position,
-            ParseErrorKind::OutOfBoundsCaptureIndex { position, .. } => &position,
+    pub fn new(input: &'t str, kind: ParseErrorKind<'t>) -> Self {
+        Self {
+            input,
+            kind,
+            more: vec![],
         }
+    }
+
+    pub fn kind(&self) -> &'t ParseErrorKind {
+        &self.kind
+    }
+
+    pub fn and(mut self, more: ParseErrorKind<'t>) -> Self {
+        self.more.push(more);
+        self
     }
 }
 
@@ -67,9 +89,21 @@ impl<'t> std::error::Error for ParseError<'t> {}
 
 impl<'t> std::fmt::Display for ParseError<'t> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use ParseErrorKind::*;
-
         writeln!(f, "{}", self.input.yellow())?;
+
+        write!(f, "{}", self.kind)?;
+
+        for kind in &self.more {
+            write!(f, "\n{kind}")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<'t> Display for ParseErrorKind<'t> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use ParseErrorKind::*;
 
         let location = self.error_location();
 
@@ -85,7 +119,7 @@ impl<'t> std::fmt::Display for ParseError<'t> {
             location.to_string().bold()
         )?;
 
-        match &self.kind {
+        match &self {
             ExpectedToken {
                 expected,
                 found,
@@ -171,7 +205,7 @@ mod tests {
     use TokenKind::*;
 
     macro_rules! assert_error {
-        ($input:literal, $error_kind:expr) => {
+       ($input:literal, $error_kind:expr $(,$more:expr)*) => {
             let input = $input;
             let err = Parser::from(input).parse().unwrap_err();
 
@@ -179,7 +213,8 @@ mod tests {
                 err,
                 ParseError {
                     input: $input,
-                    kind: $error_kind
+                    kind: $error_kind,
+                    more: vec![$($more),*]
                 }
             );
         };
@@ -323,6 +358,21 @@ mod tests {
                 kind: TokenKind::Type,
                 text: crate::lexer::TokenText::Slice("di"),
                 start: 4
+            })
+        );
+
+        assert_error!(
+            "(in)",
+            ParseErrorKind::ExpectedToken {
+                expected: &[Colon],
+                text: ")",
+                found: Rparen,
+                position: 3
+            },
+            ParseErrorKind::UnsupportedToken(Token {
+                kind: TokenKind::Type,
+                text: crate::lexer::TokenText::Slice("in"),
+                start: 1
             })
         );
     }
