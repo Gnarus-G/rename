@@ -54,7 +54,10 @@ impl TokenKind {
             Ident => "identifier",
             Arrow => "pattern seperator",
             End => "end of expression",
-            _ => "special character",
+            Colon => "colon",
+            Rparen => "closing parenthesis",
+            Lparen => "opening parenthesis",
+            CaptureIndex => "a capture index",
         };
     }
 }
@@ -128,7 +131,7 @@ impl<'t> Display for ParseErrorKind<'t> {
             } => {
                 write!(
                     f,
-                    "expected {}, but found a {}, {}",
+                    "expected a {}, but found a {}, {}",
                     expected
                         .iter()
                         .map(|e| e.description().blue().to_string())
