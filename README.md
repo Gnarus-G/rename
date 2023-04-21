@@ -44,4 +44,4 @@ For example to replace `file1`, or `file99` to `1renamed.txt` or `99renamed.txt`
 
 ## Note
 
-The "simple" match and replace syntax is still in development. The happy path pretty works, and the parser gives comprehensive error messages.
+The "simple" match and replace syntax is still in development. The happy path pretty much works, and the parser gives comprehensive error messages.
