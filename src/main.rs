@@ -86,7 +86,7 @@ fn handle_mrp_replacement<'e>(paths: &'e [PathBuf], replacer: MatchAndReplacer<'
         .filter_map(|(from, to)| to.map(|t| (from, t)))
         .for_each(|(from, to)| {
             if dry_run {
-                println!("Rename {:?} to {:?}", from, to);
+                println!("{:?} -> {:?}", from, to);
             } else {
                 if let Err(err) = std::fs::rename(from, to.to_string()) {
                     eprintln!("{:?}: {}", from, err);
