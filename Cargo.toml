@@ -13,6 +13,7 @@ path = "src/main.rs"
 clap = { version = "3.2.6", features = ["derive"] }
 regex = "1.5.6"
 mrp = { path = "./mrp/" }
+glob = "0.3.1"
 
 [workspace]
 members = ["mrp"]
