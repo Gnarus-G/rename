@@ -1,17 +1,16 @@
-use std::{cell::RefCell, collections::HashMap};
-
 use crate::{
+    captures::Captures,
     error::{ParseError, ParseErrorKind, Result},
     lexer::{Lexer, Token, TokenKind},
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CaptureType {
     Int,
     Digit,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AbstractMatchingExpression<'a> {
     Literal(&'a str),
     Capture {
@@ -29,19 +28,27 @@ pub enum AbstractReplaceExpression<'a> {
 #[derive(Debug, PartialEq)]
 pub struct MatchExpression<'a> {
     pub expressions: Vec<AbstractMatchingExpression<'a>>,
-    pub captures: RefCell<HashMap<&'a str, &'a str>>,
+    pub captures: Captures<'a>,
 }
 
 impl<'a> MatchExpression<'a> {
     pub fn new(expressions: Vec<AbstractMatchingExpression<'a>>) -> Self {
         Self {
             expressions,
-            captures: RefCell::new(HashMap::new()),
+            captures: Captures::new(),
         }
     }
 
+    pub fn get_expression(&self, idx: usize) -> Option<AbstractMatchingExpression<'a>> {
+        self.expressions.get(idx).map(|exp| exp.clone())
+    }
+
+    pub fn add_capture(&mut self, name: &'a str, value: &'a str) {
+        self.captures.put(name, value)
+    }
+
     pub fn get_capture(&self, name: &str) -> Option<&str> {
-        self.captures.borrow().get(name).map(|s| *s)
+        self.captures.get(name)
     }
 }
 

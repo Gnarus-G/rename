@@ -12,19 +12,17 @@ impl<'t> Match<'t> {
     }
 }
 
-impl<'a> MatchExpression<'a> {
+impl<'i> MatchExpression<'i> {
     /// Find the leftmost-first match in the input starting at the given position
-    pub fn find_at<'t: 'a, 's: 'a>(&'s self, input: &'t str, start: usize) -> Option<Match<'t>> {
+    pub fn find_at<'t: 'i>(&mut self, input: &'t str, start: usize) -> Option<Match<'t>> {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
         let mut capture_slice_start = None;
         let mut capture_candidate_found = None;
 
-        let mut captures_map = self.captures.borrow_mut();
-
         while state < self.expressions.len() && curr_position < input.len() {
-            let e = self.expressions.get(state).unwrap();
+            let e = self.get_expression(state).unwrap();
 
             match e {
                 AbstractMatchingExpression::Literal(literal) => {
@@ -43,7 +41,7 @@ impl<'a> MatchExpression<'a> {
 
                     let slice = &input[slice_range];
 
-                    let is_match = slice == *literal;
+                    let is_match = slice == literal;
 
                     if is_match {
                         state += 1;
@@ -64,7 +62,7 @@ impl<'a> MatchExpression<'a> {
                         if ch.is_ascii_digit() {
                             curr_position += 1;
                             state += 1;
-                            captures_map.insert(identifier.as_ref(), ch_str);
+                            self.add_capture(identifier.as_ref(), ch_str);
                         } else {
                             curr_position += 1;
                             state = 0;
@@ -74,7 +72,7 @@ impl<'a> MatchExpression<'a> {
                         let ch = input.as_bytes()[curr_position] as char;
 
                         let mut capture = |start: usize, curr_position: usize| {
-                            captures_map.insert(identifier.as_ref(), &input[start..curr_position]);
+                            self.add_capture(identifier.as_ref(), &input[start..curr_position]);
                         };
 
                         if ch.is_ascii_digit() {
@@ -117,20 +115,20 @@ impl<'a> MatchExpression<'a> {
         None
     }
 
-    pub fn find_iter<'m: 'a, 't>(&'m self, text: &'t str) -> Matches<'t, 'm> {
+    pub fn find_iter<'t>(self, text: &'t str) -> Matches<'t, 'i> {
         Matches::new(self, text)
     }
 }
 
 #[derive(Debug)]
-pub struct Matches<'t, 'm> {
+pub struct Matches<'t, 'i> {
     pub(crate) text: &'t str,
-    pub(crate) mex: &'m MatchExpression<'m>,
+    pub(crate) mex: MatchExpression<'i>,
     last_end: usize,
 }
 
 impl<'t, 'm> Matches<'t, 'm> {
-    pub fn new(mex: &'m MatchExpression<'m>, text: &'t str) -> Self {
+    pub fn new(mex: MatchExpression<'m>, text: &'t str) -> Self {
         Self {
             text,
             mex,
@@ -170,11 +168,11 @@ mod tests {
         macro_rules! assert_match_on {
             ($pattern:literal, $input:literal) => {
                 let exp = Parser::new(Lexer::new($pattern)).parse_match_exp().unwrap();
-                assert!(Matches::new(&exp, $input).count() > 0);
+                assert!(Matches::new(exp, $input).count() > 0);
             };
             ($pattern:literal, $input:literal, $boolean:literal) => {
                 let exp = Parser::new(Lexer::new($pattern)).parse_match_exp().unwrap();
-                assert_eq!(Matches::new(&exp, $input).count() > 0, $boolean);
+                assert_eq!(Matches::new(exp, $input).count() > 0, $boolean);
             };
         }
 
@@ -188,7 +186,7 @@ mod tests {
 
     #[test]
     fn two_capture_groups() {
-        let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
+        let mut exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
             .parse_match_exp()
             .unwrap();
         let text = "ab321love78";
@@ -200,7 +198,7 @@ mod tests {
 
     #[test]
     fn digit_capture_group() {
-        let exp = Parser::new(Lexer::new("digit(d:dig)"))
+        let mut exp = Parser::new(Lexer::new("digit(d:dig)"))
             .parse_match_exp()
             .unwrap();
         let text = "aewrdigit276yoypa";
@@ -211,7 +209,7 @@ mod tests {
 
     #[test]
     fn three_capture_groups() {
-        let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)ly(d:dig)"))
+        let mut exp = Parser::new(Lexer::new("ab(n:int)love(i:int)ly(d:dig)"))
             .parse_match_exp()
             .unwrap();
         let text = "ab321love78ly8";
@@ -224,7 +222,7 @@ mod tests {
 
     #[test]
     fn int_capture_group_at_the_begining() {
-        let exp = Parser::new(Lexer::new("(n:int)love(i:int)ly(d:dig)"))
+        let mut exp = Parser::new(Lexer::new("(n:int)love(i:int)ly(d:dig)"))
             .parse_match_exp()
             .unwrap();
         let text = "ab321love78ly8";
@@ -238,7 +236,7 @@ mod tests {
     #[test]
     fn special() {
         let mut parser = Parser::from("hello(as:dig)->oh(as)hi");
-        let exp = parser.parse_match_exp().unwrap();
+        let mut exp = parser.parse_match_exp().unwrap();
         assert_eq!(exp.find_at("ashello090", 0).unwrap().as_str(), "hello0");
     }
 
@@ -247,7 +245,7 @@ mod tests {
         let mut parser = Parser::from("xy(n:int)");
         let pattern = parser.parse_match_exp().unwrap();
         let text = "wxy10xy33asdfxy81";
-        let mut matches = Matches::new(&pattern, text);
+        let mut matches = Matches::new(pattern, text);
 
         assert_eq!(matches.next().unwrap().as_str(), "xy10");
         assert_eq!(matches.next().unwrap().as_str(), "xy33");

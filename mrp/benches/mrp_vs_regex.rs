@@ -12,7 +12,7 @@ fn regex_benchmark(c: &mut Criterion) {
 
 fn mrp_benchmark(c: &mut Criterion) {
     let exp = Parser::from(EXP).parse().unwrap();
-    let r = MatchAndReplacer::new(&exp);
+    let mut r = MatchAndReplacer::new(exp);
     c.bench_function("mrp strat", |b| {
         b.iter(|| {
             r.apply(INPUT);

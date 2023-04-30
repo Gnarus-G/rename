@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::ExitCode, thread::JoinHandle};
+use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
 use mrp::{MatchAndReplaceStrategy, MatchAndReplacer};
@@ -43,54 +43,17 @@ fn main() -> ExitCode {
         base_args.paths
     };
 
+    let options = &rename::BulkRenameOptions {
+        no_rename: base_args.dry_run,
+    };
+
     match base_args.command {
-        Command::REGEX(ref args) => handle_regex_replacement(&args, &paths, base_args.dry_run),
-        Command::SIMPLE(ref args) => match mrp::parser::Parser::from(&args.expression).parse() {
-            Ok(ref e) => {
+        Command::REGEX(mut args) => rename::in_bulk(&paths, &mut args, options),
+        Command::SIMPLE(args) => match mrp::parser::Parser::from(&args.expression).parse() {
+            Ok(e) => {
                 let mut replacer = MatchAndReplacer::new(e);
                 replacer.set_strip(args.strip);
-
-                let num = num_cpus::get();
-
-                let s = paths.len() / num;
-
-                let mut hs: Vec<JoinHandle<()>> = vec![];
-
-                paths
-                    .chunks(s)
-                    .map(|chunk| {
-                        handle_mrp_replacement(chunk, &replacer).into_iter().map(
-                            move |(from, to)| {
-                                return move || {
-                                    if base_args.dry_run {
-                                        println!("{:?} -> {:?}", from, to);
-                                    } else {
-                                        if let Err(err) = std::fs::rename(from.clone(), to) {
-                                            eprintln!("{:?}: {}", from, err);
-                                        }
-                                    }
-                                };
-                            },
-                        )
-                    })
-                    .enumerate()
-                    .for_each(|(id, rename_jobs)| {
-                        let rename_count = rename_jobs.len();
-                        let work = || {
-                            rename_jobs.for_each(|job| job());
-                        };
-                        let builder = std::thread::Builder::new();
-                        if let Ok(h) = builder.spawn(work.clone()) {
-                            println!("spawned thread {} to rename {} files", id, rename_count);
-                            return hs.push(h);
-                        }
-                        eprintln!("failed to spawn thread {}, so just renaming the next {} files on the main thread", id, rename_count);
-                        work();
-                    });
-
-                for h in hs {
-                    h.join().expect("Couldn't join on the associated thread");
-                }
+                rename::in_bulk(&paths, &mut replacer, options);
             }
             Err(e) => {
                 eprintln!("{e}");
@@ -111,27 +74,6 @@ struct SimpleArgs {
     strip: bool,
 }
 
-fn handle_mrp_replacement<'e>(
-    paths: &'e [PathBuf],
-    replacer: &MatchAndReplacer<'e>,
-) -> Vec<(String, String)> {
-    paths
-        .iter()
-        .filter_map(|p| {
-            let str = p.to_str();
-
-            if str.is_none() {
-                eprintln!("Path is invalid unicode: {:?}", p);
-            }
-
-            return str;
-        })
-        .map(|p| (p, replacer.apply(p)))
-        .filter_map(|(from, to)| to.map(|t| (from, t)))
-        .map(|(f, t)| (f.to_owned(), t.to_string()))
-        .collect()
-}
-
 #[derive(Debug, Args, Clone)]
 struct RegexArgs {
     /// The regex pattern with which to search.
@@ -140,26 +82,8 @@ struct RegexArgs {
     replacement: String,
 }
 
-fn handle_regex_replacement(args: &RegexArgs, paths: &[PathBuf], dry_run: bool) {
-    let transform = |name| {
-        return (
-            name,
-            args.pattern.replace(name, &args.replacement).to_string(),
-        );
-    };
-
-    paths
-        .iter()
-        .for_each(|path| match path.to_str().map(transform) {
-            None => eprintln!("Path is invalid unicode: {:?}", path),
-            Some((from, to)) => {
-                if dry_run {
-                    println!("Rename {:?} to {:?}", path, to);
-                } else {
-                    if let Err(err) = std::fs::rename(from, to) {
-                        eprintln!("{}: {}", from, err);
-                    }
-                }
-            }
-        })
+impl<'s> MatchAndReplaceStrategy<'s> for RegexArgs {
+    fn apply(&mut self, value: &'s str) -> Option<std::borrow::Cow<'s, str>> {
+        Some(self.pattern.replace(value, self.replacement.clone()))
+    }
 }
