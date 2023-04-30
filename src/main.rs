@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::ExitCode};
+use std::{path::PathBuf, process::ExitCode, thread::JoinHandle};
 
 use clap::{Args, Parser, Subcommand};
 use mrp::{MatchAndReplaceStrategy, MatchAndReplacer};
@@ -49,7 +49,48 @@ fn main() -> ExitCode {
             Ok(ref e) => {
                 let mut replacer = MatchAndReplacer::new(e);
                 replacer.set_strip(args.strip);
-                handle_mrp_replacement(&paths, replacer, base_args.dry_run);
+
+                let num = num_cpus::get();
+
+                let s = paths.len() / num;
+
+                let mut hs: Vec<JoinHandle<()>> = vec![];
+
+                paths
+                    .chunks(s)
+                    .map(|chunk| {
+                        handle_mrp_replacement(chunk, &replacer).into_iter().map(
+                            move |(from, to)| {
+                                return move || {
+                                    if base_args.dry_run {
+                                        println!("{:?} -> {:?}", from, to);
+                                    } else {
+                                        if let Err(err) = std::fs::rename(from.clone(), to) {
+                                            eprintln!("{:?}: {}", from, err);
+                                        }
+                                    }
+                                };
+                            },
+                        )
+                    })
+                    .enumerate()
+                    .for_each(|(id, rename_jobs)| {
+                        let rename_count = rename_jobs.len();
+                        let work = || {
+                            rename_jobs.for_each(|job| job());
+                        };
+                        let builder = std::thread::Builder::new();
+                        if let Ok(h) = builder.spawn(work.clone()) {
+                            println!("spawned thread {} to rename {} files", id, rename_count);
+                            return hs.push(h);
+                        }
+                        eprintln!("failed to spawn thread {}, so just renaming the next {} files on the main thread", id, rename_count);
+                        work();
+                    });
+
+                for h in hs {
+                    h.join().expect("Couldn't join on the associated thread");
+                }
             }
             Err(e) => {
                 eprintln!("{e}");
@@ -70,7 +111,10 @@ struct SimpleArgs {
     strip: bool,
 }
 
-fn handle_mrp_replacement<'e>(paths: &'e [PathBuf], replacer: MatchAndReplacer<'e>, dry_run: bool) {
+fn handle_mrp_replacement<'e>(
+    paths: &'e [PathBuf],
+    replacer: &MatchAndReplacer<'e>,
+) -> Vec<(String, String)> {
     paths
         .iter()
         .filter_map(|p| {
@@ -84,15 +128,8 @@ fn handle_mrp_replacement<'e>(paths: &'e [PathBuf], replacer: MatchAndReplacer<'
         })
         .map(|p| (p, replacer.apply(p)))
         .filter_map(|(from, to)| to.map(|t| (from, t)))
-        .for_each(|(from, to)| {
-            if dry_run {
-                println!("{:?} -> {:?}", from, to);
-            } else {
-                if let Err(err) = std::fs::rename(from, to.to_string()) {
-                    eprintln!("{:?}: {}", from, err);
-                }
-            }
-        });
+        .map(|(f, t)| (f.to_owned(), t.to_string()))
+        .collect()
 }
 
 #[derive(Debug, Args, Clone)]

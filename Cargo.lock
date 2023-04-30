@@ -494,6 +494,7 @@ dependencies = [
  "clap",
  "glob",
  "mrp",
+ "num_cpus",
  "regex",
 ]
 
