@@ -1,7 +1,7 @@
 use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
-use mrp::{MatchAndReplaceStrategy, MatchAndReplacer};
+use mrp::{parser::MatchAndReplaceExpression, MatchAndReplaceStrategy, MatchAndReplacer};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, setting = clap::AppSettings::DeriveDisplayOrder)]
@@ -54,17 +54,11 @@ fn main() -> ExitCode {
 
     match base_args.command {
         Command::REGEX(args) => rename::in_bulk(&paths, &args, options, base_args.multithreading),
-        Command::SIMPLE(args) => match mrp::parser::Parser::from(&args.expression).parse() {
-            Ok(e) => {
-                let mut replacer = MatchAndReplacer::new(e);
-                replacer.set_strip(args.strip);
-                rename::in_bulk(&paths, &mut replacer, options, base_args.multithreading);
-            }
-            Err(e) => {
-                eprintln!("{e}");
-                return ExitCode::FAILURE;
-            }
-        },
+        Command::SIMPLE(args) => {
+            let mut replacer = MatchAndReplacer::new(args.expression);
+            replacer.set_strip(args.strip);
+            rename::in_bulk(&paths, &mut replacer, options, base_args.multithreading);
+        }
     };
 
     ExitCode::SUCCESS
@@ -73,7 +67,7 @@ fn main() -> ExitCode {
 #[derive(Debug, Args)]
 struct SimpleArgs {
     /// A Match & Replace expression in the custom MRP syntax.
-    expression: String,
+    expression: MatchAndReplaceExpression<'static>,
     /// Strip off anything not explicitly matched for while replacting.
     #[clap(short, long)]
     strip: bool,

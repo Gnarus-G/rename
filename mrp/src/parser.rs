@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     error::{ParseError, ParseErrorKind, Result},
     lexer::{Lexer, Token, TokenKind},
@@ -48,6 +50,15 @@ pub struct ReplaceExpression<'a> {
 pub struct MatchAndReplaceExpression<'a> {
     pub mex: MatchExpression<'a>,
     pub rex: ReplaceExpression<'a>,
+}
+
+impl FromStr for MatchAndReplaceExpression<'static> {
+    type Err = ParseError<'static>;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let input = Box::leak(s.into());
+        Parser::new(Lexer::new(input)).parse()
+    }
 }
 
 pub struct Parser<'a> {

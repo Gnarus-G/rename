@@ -63,7 +63,7 @@ impl<'t> std::fmt::Display for ParseError<'t> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ParseErrorKind::*;
 
-        writeln!(f, "{}", self.input.yellow())?;
+        writeln!(f, "\n{}", self.input.yellow())?;
 
         let location = self.error_location();
 
