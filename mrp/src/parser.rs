@@ -1,7 +1,4 @@
-use std::str::FromStr;
-
 use crate::{
-    captures::Captures,
     error::{ParseError, ParseErrorKind, Result},
     lexer::{Lexer, Token, TokenKind},
 };

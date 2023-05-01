@@ -10,9 +10,13 @@ struct RenameArgs {
     #[clap(subcommand)]
     command: Command,
 
-    /// pattern for the paths to rename.
+    /// Pattern for the paths to rename.
     #[clap(global = true, long, conflicts_with = "paths")]
     glob: Option<String>,
+
+    /// Enable multi-threading to process more files at a time
+    #[clap(global = true, short, long = "multi")]
+    multithreading: bool,
 
     /// One or more paths to rename.
     #[clap(global = true)]
@@ -49,12 +53,12 @@ fn main() -> ExitCode {
     };
 
     match base_args.command {
-        Command::REGEX(mut args) => rename::in_bulk(&paths, &mut args, options),
+        Command::REGEX(args) => rename::in_bulk(&paths, &args, options, base_args.multithreading),
         Command::SIMPLE(args) => match mrp::parser::Parser::from(&args.expression).parse() {
             Ok(e) => {
                 let mut replacer = MatchAndReplacer::new(e);
                 replacer.set_strip(args.strip);
-                rename::in_bulk(&paths, &mut replacer, options);
+                rename::in_bulk(&paths, &mut replacer, options, base_args.multithreading);
             }
             Err(e) => {
                 eprintln!("{e}");
@@ -84,7 +88,7 @@ struct RegexArgs {
 }
 
 impl<'s> MatchAndReplaceStrategy<'s> for RegexArgs {
-    fn apply(&mut self, value: &'s str) -> Option<std::borrow::Cow<'s, str>> {
+    fn apply(&self, value: &'s str) -> Option<std::borrow::Cow<'s, str>> {
         Some(self.pattern.replace(value, self.replacement.clone()))
     }
 }
