@@ -145,15 +145,17 @@ impl<'t> std::fmt::Display for ParseError<'t> {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
-    use crate::parser::Parser;
+    use crate::parser::MatchAndReplaceExpression;
     use ParseErrorKind::*;
     use TokenKind::*;
 
     macro_rules! assert_error {
         ($input:literal, $error_kind:expr) => {
             let input = $input;
-            let err = Parser::from(input).parse().unwrap_err();
+            let err = MatchAndReplaceExpression::from_str(input).unwrap_err();
 
             assert_eq!(
                 err,

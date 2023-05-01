@@ -31,6 +31,15 @@ pub struct MatchExpression<'a> {
     pub expressions: Vec<AbstractMatchingExpression<'a>>,
 }
 
+impl FromStr for MatchExpression<'static> {
+    type Err = ParseError<'static>;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let input = Box::leak(s.into());
+        Parser::new(Lexer::new(input)).parse_match_exp()
+    }
+}
+
 impl<'a> MatchExpression<'a> {
     pub fn new(expressions: Vec<AbstractMatchingExpression<'a>>) -> Self {
         Self { expressions }
@@ -64,18 +73,6 @@ impl FromStr for MatchAndReplaceExpression<'static> {
 pub struct Parser<'a> {
     lexer: Lexer<'a>,
     peeked: Option<Token<'a>>,
-}
-
-impl<'a> From<&'a str> for Parser<'a> {
-    fn from(input: &'a str) -> Self {
-        Self::new(Lexer::new(input))
-    }
-}
-
-impl<'a> From<&'a String> for Parser<'a> {
-    fn from(input: &'a String) -> Self {
-        Self::new(Lexer::new(&input))
-    }
 }
 
 impl<'a> Parser<'a> {

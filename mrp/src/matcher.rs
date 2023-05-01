@@ -175,6 +175,8 @@ impl<'t: 'm, 'm> Iterator for Matches<'t, 'm> {
 #[cfg(test)]
 mod tests {
 
+    use std::str::FromStr;
+
     use crate::{lexer::Lexer, parser::Parser};
 
     use super::*;
@@ -258,15 +260,13 @@ mod tests {
 
     #[test]
     fn special() {
-        let mut parser = Parser::from("hello(as:dig)->oh(as)hi");
-        let exp = parser.parse_match_exp().unwrap();
+        let exp = MatchExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
         assert_eq!(exp.find_at("ashello090", 0).unwrap().as_str(), "hello0");
     }
 
     #[test]
     fn muliple_matches() {
-        let mut parser = Parser::from("xy(n:int)");
-        let pattern = parser.parse_match_exp().unwrap();
+        let pattern = MatchExpression::from_str("xy(n:int)").unwrap();
         let text = "wxy10xy33asdfxy81";
         let mut matches = Matches::new(pattern, text);
 
