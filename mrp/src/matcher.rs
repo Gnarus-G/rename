@@ -1,4 +1,7 @@
-use crate::parser::{AbstractMatchingExpression, CaptureType, MatchExpression};
+use crate::{
+    captures::Captures,
+    parser::{AbstractMatchingExpression, CaptureType, MatchExpression},
+};
 
 pub struct Match<'t> {
     text: &'t str,
@@ -20,6 +23,8 @@ impl<'i> MatchExpression<'i> {
         let mut state = 0;
         let mut capture_slice_start = None;
         let mut capture_candidate_found = None;
+
+        let mut captures = Captures::new();
 
         while state < self.expressions.len() && curr_position < input.len() {
             let e = self.get_expression(state).unwrap();
@@ -62,7 +67,7 @@ impl<'i> MatchExpression<'i> {
                         if ch.is_ascii_digit() {
                             curr_position += 1;
                             state += 1;
-                            self.add_capture(identifier.as_ref(), ch_str);
+                            captures.put(identifier.as_ref(), ch_str);
                         } else {
                             curr_position += 1;
                             state = 0;
@@ -72,7 +77,7 @@ impl<'i> MatchExpression<'i> {
                         let ch = input.as_bytes()[curr_position] as char;
 
                         let mut capture = |start: usize, curr_position: usize| {
-                            self.add_capture(identifier.as_ref(), &input[start..curr_position]);
+                            captures.put(identifier.as_ref(), &input[start..curr_position]);
                         };
 
                         if ch.is_ascii_digit() {
@@ -103,6 +108,8 @@ impl<'i> MatchExpression<'i> {
                 },
             }
         }
+
+        self.captures = captures;
 
         if state == self.expressions.len() {
             return Some(Match {

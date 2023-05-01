@@ -58,8 +58,6 @@ impl<'i> MatchAndReplaceStrategy<'i> for MatchAndReplacer<'i> {
                     new.to_mut().replace_range(m.start..m.end, &replacement_str);
                 }
 
-                self.mrex.mex.captures = captures::Captures::new();
-
                 Some(new)
             }
         }

@@ -43,10 +43,6 @@ impl<'a> MatchExpression<'a> {
         self.expressions.get(idx).map(|exp| exp.clone())
     }
 
-    pub fn add_capture(&mut self, name: &'a str, value: &'a str) {
-        self.captures.put(name, value)
-    }
-
     pub fn get_capture(&self, name: &str) -> Option<&str> {
         self.captures.get(name)
     }
