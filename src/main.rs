@@ -45,6 +45,7 @@ fn main() -> ExitCode {
 
     let options = &rename::BulkRenameOptions {
         no_rename: base_args.dry_run,
+        quiet: false,
     };
 
     match base_args.command {

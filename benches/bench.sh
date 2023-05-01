@@ -1,3 +1,5 @@
+cargo build --release;
+
 echo "--- perl-rename";
 echo "setting up ~54K files..."
 mkdir files;
@@ -12,7 +14,7 @@ echo "setting up ~54K files..."
 mkdir files;
 touch files/g-{0001..0038}-a-{0001..0038}-al-{0001..0038}; # ~54K files
 echo "running..."
-time rn simple "g-(g:int)-a-(a:int)-al-(al:int)->artist-(a)-album-(al)-genre-(g)" files/g*;
+time ../target/release/rn simple "g-(g:int)-a-(a:int)-al-(al:int)->artist-(a)-album-(al)-genre-(g)" files/g*;
 rm -r files;
 
 echo;

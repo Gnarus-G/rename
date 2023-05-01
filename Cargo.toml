@@ -16,8 +16,12 @@ mrp = { path = "./mrp/" }
 glob = "0.3.1"
 num_cpus = "1.15.0"
 
+[dev-dependencies]
+criterion = "0.4"
+
+[[bench]]
+name = "bulk_renames"
+harness = false
+
 [workspace]
 members = ["mrp"]
-
-[toolchain]
-channel = "nightly"
