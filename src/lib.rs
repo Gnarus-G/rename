@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use mrp::MatchAndReplaceStrategy;
 
+#[derive(Default, Clone)]
 pub struct BulkRenameOptions {
     pub no_rename: bool,
     pub quiet: bool,

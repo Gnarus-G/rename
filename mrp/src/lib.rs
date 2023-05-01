@@ -4,14 +4,14 @@ pub mod lexer;
 mod matcher;
 pub mod parser;
 
-use std::borrow::Cow;
+use std::{borrow::Cow, ops::Deref, sync::Arc};
 
 use parser::{AbstractReplaceExpression, MatchAndReplaceExpression};
 
 /// Representing a stragety by which to match and replace on a `string` value
 pub trait MatchAndReplaceStrategy<'s> {
     /// Match and replace
-    fn apply(&mut self, value: &'s str) -> Option<std::borrow::Cow<'s, str>>;
+    fn apply(&self, value: &'s str) -> Option<std::borrow::Cow<'s, str>>;
 }
 
 pub struct MatchAndReplacer<'m> {
@@ -31,11 +31,17 @@ impl<'m> MatchAndReplacer<'m> {
     }
 }
 
+impl<'i> MatchAndReplaceStrategy<'i> for Arc<MatchAndReplacer<'i>> {
+    fn apply(&self, value: &'i str) -> Option<std::borrow::Cow<'i, str>> {
+        self.deref().apply(value)
+    }
+}
+
 impl<'i> MatchAndReplaceStrategy<'i> for MatchAndReplacer<'i> {
-    fn apply(&mut self, value: &'i str) -> Option<std::borrow::Cow<'i, str>> {
-        match self.mrex.mex.find_at(value, 0) {
-            None => None,
-            Some(m) => {
+    fn apply(&self, value: &'i str) -> Option<std::borrow::Cow<'i, str>> {
+        match self.mrex.mex.find_at_capturing(value, 0) {
+            (None, _) => None,
+            (Some(m), captures) => {
                 let mut new = Cow::from(value);
                 let replacement_str: String = self
                     .mrex
@@ -44,10 +50,8 @@ impl<'i> MatchAndReplaceStrategy<'i> for MatchAndReplacer<'i> {
                     .iter()
                     .map(|e| match e {
                         AbstractReplaceExpression::Literal(l) => *l,
-                        AbstractReplaceExpression::Identifier(i) => self
-                            .mrex
-                            .mex
-                            .get_capture(i)
+                        AbstractReplaceExpression::Identifier(i) => captures
+                            .get(i)
                             .expect(&format!("'{i}' should have been captured")),
                     })
                     .collect();
@@ -87,7 +91,7 @@ mod tests {
     fn one_literal_and_int_capture() {
         let input = "lit(num:int)->lul(num)";
         let expression = Parser::from(input).parse().unwrap();
-        let mut strat = MatchAndReplacer::new(expression);
+        let strat = MatchAndReplacer::new(expression);
 
         assert_eq!(strat.apply("lit12").unwrap(), "lul12");
     }

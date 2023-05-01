@@ -16,8 +16,11 @@ impl<'t> Match<'t> {
 }
 
 impl<'i> MatchExpression<'i> {
-    /// Find the leftmost-first match in the input starting at the given position
-    pub fn find_at<'t: 'i>(&mut self, input: &'t str, start: usize) -> Option<Match<'t>> {
+    pub fn find_at_capturing<'t: 'i>(
+        &self,
+        input: &'t str,
+        start: usize,
+    ) -> (Option<Match<'t>>, Captures<'i>) {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
@@ -109,17 +112,23 @@ impl<'i> MatchExpression<'i> {
             }
         }
 
-        self.captures = captures;
-
         if state == self.expressions.len() {
-            return Some(Match {
-                text: input,
-                start: legit_start,
-                end: curr_position,
-            });
+            return (
+                Some(Match {
+                    text: input,
+                    start: legit_start,
+                    end: curr_position,
+                }),
+                captures,
+            );
         }
 
-        None
+        (None, captures)
+    }
+
+    /// Find the leftmost-first match in the input starting at the given position
+    pub fn find_at<'t: 'i>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
+        self.find_at_capturing(input, start).0
     }
 
     pub fn find_iter<'t>(self, text: &'t str) -> Matches<'t, 'i> {
@@ -193,57 +202,64 @@ mod tests {
 
     #[test]
     fn two_capture_groups() {
-        let mut exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
+        let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)"))
             .parse_match_exp()
             .unwrap();
         let text = "ab321love78";
 
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
-        assert_eq!(exp.get_capture("n").unwrap(), "321");
-        assert_eq!(exp.get_capture("i").unwrap(), "78");
+
+        let cap = exp.find_at_capturing(text, 0).1;
+
+        assert_eq!(cap.get("n").unwrap(), "321");
+        assert_eq!(cap.get("i").unwrap(), "78");
     }
 
     #[test]
     fn digit_capture_group() {
-        let mut exp = Parser::new(Lexer::new("digit(d:dig)"))
+        let exp = Parser::new(Lexer::new("digit(d:dig)"))
             .parse_match_exp()
             .unwrap();
         let text = "aewrdigit276yoypa";
 
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), "digit2");
-        assert_eq!(exp.get_capture("d").unwrap(), "2");
+        let cap = exp.find_at_capturing(text, 0).1;
+        assert_eq!(cap.get("d").unwrap(), "2");
     }
 
     #[test]
     fn three_capture_groups() {
-        let mut exp = Parser::new(Lexer::new("ab(n:int)love(i:int)ly(d:dig)"))
+        let exp = Parser::new(Lexer::new("ab(n:int)love(i:int)ly(d:dig)"))
             .parse_match_exp()
             .unwrap();
         let text = "ab321love78ly8";
 
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
-        assert_eq!(exp.get_capture("n").unwrap(), "321");
-        assert_eq!(exp.get_capture("i").unwrap(), "78");
-        assert_eq!(exp.get_capture("d").unwrap(), "8");
+        let cap = exp.find_at_capturing(text, 0).1;
+        assert_eq!(cap.get("n").unwrap(), "321");
+        assert_eq!(cap.get("i").unwrap(), "78");
+        assert_eq!(cap.get("d").unwrap(), "8");
     }
 
     #[test]
     fn int_capture_group_at_the_begining() {
-        let mut exp = Parser::new(Lexer::new("(n:int)love(i:int)ly(d:dig)"))
+        let exp = Parser::new(Lexer::new("(n:int)love(i:int)ly(d:dig)"))
             .parse_match_exp()
             .unwrap();
         let text = "ab321love78ly8";
 
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), &text[2..]);
-        assert_eq!(exp.get_capture("n").unwrap(), "321");
-        assert_eq!(exp.get_capture("i").unwrap(), "78");
-        assert_eq!(exp.get_capture("d").unwrap(), "8");
+
+        let cap = exp.find_at_capturing(text, 0).1;
+        assert_eq!(cap.get("n").unwrap(), "321");
+        assert_eq!(cap.get("i").unwrap(), "78");
+        assert_eq!(cap.get("d").unwrap(), "8");
     }
 
     #[test]
     fn special() {
         let mut parser = Parser::from("hello(as:dig)->oh(as)hi");
-        let mut exp = parser.parse_match_exp().unwrap();
+        let exp = parser.parse_match_exp().unwrap();
         assert_eq!(exp.find_at("ashello090", 0).unwrap().as_str(), "hello0");
     }
 

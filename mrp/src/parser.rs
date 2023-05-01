@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     captures::Captures,
     error::{ParseError, ParseErrorKind, Result},
@@ -28,23 +30,15 @@ pub enum AbstractReplaceExpression<'a> {
 #[derive(Debug, PartialEq)]
 pub struct MatchExpression<'a> {
     pub expressions: Vec<AbstractMatchingExpression<'a>>,
-    pub captures: Captures<'a>,
 }
 
 impl<'a> MatchExpression<'a> {
     pub fn new(expressions: Vec<AbstractMatchingExpression<'a>>) -> Self {
-        Self {
-            expressions,
-            captures: Captures::new(),
-        }
+        Self { expressions }
     }
 
     pub fn get_expression(&self, idx: usize) -> Option<AbstractMatchingExpression<'a>> {
         self.expressions.get(idx).map(|exp| exp.clone())
-    }
-
-    pub fn get_capture(&self, name: &str) -> Option<&str> {
-        self.captures.get(name)
     }
 }
 
