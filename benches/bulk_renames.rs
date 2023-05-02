@@ -1,13 +1,14 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use mrp::{parser::Parser, MatchAndReplacer};
+use mrp::MatchAndReplacer;
 use rename::{in_bulk, BulkRenameOptions};
 
 fn get_renamer() -> MatchAndReplacer<'static> {
-    let expr = Parser::from("g-(g:int)-a-(a:int)-al-(al:int)->artist-(a)-album-(al)-genre-(g)")
-        .parse()
-        .unwrap();
+    let expr = mrp::parser::MatchAndReplaceExpression::from_str(
+        "g-(g:int)-a-(a:int)-al-(al:int)->artist-(a)-album-(al)-genre-(g)",
+    )
+    .unwrap();
 
     return MatchAndReplacer::new(expr);
 }
@@ -36,9 +37,8 @@ fn renaming_files(c: &mut Criterion) {
                     &renamer,
                     &BulkRenameOptions {
                         no_rename: true,
-                        quiet: true,
+                        multi: false,
                     },
-                    false,
                 )
             });
         });
@@ -61,9 +61,8 @@ fn renaming_files_in_parallel(c: &mut Criterion) {
                     &renamer,
                     &BulkRenameOptions {
                         no_rename: true,
-                        quiet: true,
+                        multi: true,
                     },
-                    true,
                 )
             });
         });

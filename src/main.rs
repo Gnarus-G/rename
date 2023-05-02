@@ -65,14 +65,15 @@ fn main() -> ExitCode {
 
     let options = &rename::BulkRenameOptions {
         no_rename: base_args.dry_run,
+        multi: base_args.multithreading,
     };
 
     match base_args.command {
-        Command::REGEX(args) => rename::in_bulk(&paths, &args, options, base_args.multithreading),
+        Command::REGEX(args) => rename::in_bulk(&paths, &args, options),
         Command::SIMPLE(args) => {
             let mut replacer = MatchAndReplacer::new(args.expression);
             replacer.set_strip(args.strip);
-            rename::in_bulk(&paths, &mut replacer, options, base_args.multithreading);
+            rename::in_bulk(&paths, &mut replacer, options);
         }
     };
 
