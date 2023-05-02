@@ -18,6 +18,14 @@ struct RenameArgs {
     #[clap(global = true, short, long = "multi")]
     multithreading: bool,
 
+    /// Prevent diagnostic logging
+    #[clap(global = true, short, long)]
+    quiet: bool,
+
+    /// Determine diagnostic log level
+    #[clap(global = true, short, long = "verbose", parse(from_occurrences))]
+    verbosity: usize,
+
     /// One or more paths to rename.
     #[clap(global = true)]
     paths: Vec<std::path::PathBuf>,
@@ -38,6 +46,14 @@ enum Command {
 fn main() -> ExitCode {
     let base_args = RenameArgs::parse();
 
+    stderrlog::new()
+        .module("rename")
+        .quiet(base_args.quiet)
+        .verbosity(base_args.verbosity)
+        .timestamp(stderrlog::Timestamp::Millisecond)
+        .init()
+        .unwrap();
+
     let paths = if let Some(aw) = &base_args.glob {
         glob::glob(aw)
             .expect("invalid glob pattern")
@@ -49,7 +65,6 @@ fn main() -> ExitCode {
 
     let options = &rename::BulkRenameOptions {
         no_rename: base_args.dry_run,
-        quiet: false,
     };
 
     match base_args.command {

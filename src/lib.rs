@@ -1,11 +1,11 @@
 use std::{path::PathBuf, thread};
 
+use log::*;
 use mrp::MatchAndReplaceStrategy;
 
 #[derive(Default)]
 pub struct BulkRenameOptions {
     pub no_rename: bool,
-    pub quiet: bool,
 }
 
 pub fn in_bulk<'p: 'r, 'r, R: MatchAndReplaceStrategy<'r> + std::marker::Sync>(
@@ -22,9 +22,9 @@ pub fn in_bulk<'p: 'r, 'r, R: MatchAndReplaceStrategy<'r> + std::marker::Sync>(
         let thread_count = num_cpus::get();
 
         if thread_count > paths.len() {
-            println!("there are more threads that files to rename, so single threaded it is");
+            warn!("there are more threads that files to rename, so single threaded it is");
         } else if thread_count * 500 > paths.len() {
-            println!("probably too few files to warrant multithreading, but here we go...");
+            warn!("probably too few files to warrant multithreading, but here we go...");
             return in_bulk_multithreaded(paths, rename, thread_count, options);
         } else {
             return in_bulk_multithreaded(paths, rename, thread_count, options);
@@ -42,7 +42,7 @@ fn in_bulk_single_thread<'p: 'r, 'r, R: MatchAndReplaceStrategy<'r>>(
         let str = p.to_str();
 
         if str.is_none() {
-            eprintln!("Path is invalid unicode: {:?}", p);
+            error!("Path is invalid unicode: {:?}", p);
         }
 
         return str;
@@ -51,12 +51,10 @@ fn in_bulk_single_thread<'p: 'r, 'r, R: MatchAndReplaceStrategy<'r>>(
     for from in values {
         if let Some(to) = rename.apply(from) {
             if options.no_rename {
-                if !options.quiet {
-                    println!("{:?} -> {:?}", from, to);
-                }
+                println!("{:?} -> {:?}", from, to);
             } else {
                 if let Err(err) = std::fs::rename(from, to.to_string()) {
-                    eprintln!("{:?}: {}", from, err);
+                    error!("{:?}: {}", from, err);
                 }
             };
         }
@@ -69,10 +67,10 @@ fn in_bulk_multithreaded<'p: 'r, 'r, R: MatchAndReplaceStrategy<'r> + std::marke
     thread_count: usize,
     options: &BulkRenameOptions,
 ) {
-    println!("found {} threads available on this machine", thread_count);
+    debug!("found {} threads available on this machine", thread_count);
     let max_chunk_size = paths.len() / (thread_count - 1);
 
-    println!(
+    debug!(
         "chunking work, to handle {} files in each of {} threads",
         max_chunk_size, thread_count
     );
@@ -86,22 +84,18 @@ fn in_bulk_multithreaded<'p: 'r, 'r, R: MatchAndReplaceStrategy<'r> + std::marke
             if let Ok(handle) = thread::Builder::new().spawn_scoped(s, || {
                 in_bulk_single_thread(path_chunk, rename, &options);
             }) {
-                if !options.quiet {
-                    println!(
-                        "spawned thread {} with {} file to rename",
-                        id,
-                        path_chunk.len()
-                    );
-                }
+                debug!(
+                    "spawned thread {} with {} file to rename",
+                    id,
+                    path_chunk.len()
+                );
                 join_handles.push(handle);
             } else {
-                if !options.quiet {
-                    println!(
-                        "failed to spawn thread {}, renaming the next {} files in the main thread",
-                        id,
-                        path_chunk.len()
-                    );
-                }
+                error!(
+                    "failed to spawn thread {}, renaming the next {} files in the main thread",
+                    id,
+                    path_chunk.len()
+                );
                 in_bulk_single_thread(path_chunk, rename, &options);
             };
         }
