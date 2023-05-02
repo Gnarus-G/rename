@@ -1,8 +1,7 @@
 use std::{path::PathBuf, str::FromStr};
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use mrp::MatchAndReplacer;
-use rename::{in_bulk, BulkRenameOptions};
+use mrp::{MatchAndReplaceStrategy, MatchAndReplacer};
 
 fn get_renamer() -> MatchAndReplacer<'static> {
     let expr = mrp::parser::MatchAndReplaceExpression::from_str(
@@ -32,42 +31,13 @@ fn renaming_files(c: &mut Criterion) {
 
         group.bench_with_input(BenchmarkId::from_parameter(size), &files, |b, files| {
             b.iter(|| {
-                in_bulk(
-                    &files,
-                    &renamer,
-                    &BulkRenameOptions {
-                        no_rename: true,
-                        multi: false,
-                    },
-                )
+                files.iter().filter_map(|p| p.to_str()).for_each(|name| {
+                    renamer.apply(name);
+                });
             });
         });
     }
 }
 
-fn renaming_files_in_parallel(c: &mut Criterion) {
-    let renamer = get_renamer();
-    let mut group = c.benchmark_group("renames in parallel");
-    group.sample_size(10);
-
-    for size in [1000, 10000, 100000, 1000000].iter() {
-        let files = create_file_paths(*size);
-        group.throughput(criterion::Throughput::Elements(*size as u64));
-
-        group.bench_with_input(BenchmarkId::from_parameter(size), &files, |b, files| {
-            b.iter(|| {
-                in_bulk(
-                    &files,
-                    &renamer,
-                    &BulkRenameOptions {
-                        no_rename: true,
-                        multi: true,
-                    },
-                )
-            });
-        });
-    }
-}
-
-criterion_group!(benches, renaming_files, renaming_files_in_parallel);
+criterion_group!(benches, renaming_files);
 criterion_main!(benches);
