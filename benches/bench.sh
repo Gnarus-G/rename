@@ -18,7 +18,7 @@ time ../target/release/rn simple "g-(g:int)-a-(a:int)-al-(al:int)->artist-(a)-al
 rm -r files;
 
 echo;
-echo "--- rename simple in parallel";
+echo "--- rename simple";
 echo "setting up ~1.5M files..."
 mkdir files;
 mkdir files1;
@@ -77,6 +77,6 @@ touch files25/g-{0001..0038}-a-{0001..0038}-al-{0001..0038}; # ~54K files
 touch files26/g-{0001..0038}-a-{0001..0038}-al-{0001..0038}; # ~54K files
 touch files27/g-{0001..0038}-a-{0001..0038}-al-{0001..0038}; # ~54K files
 echo "running..."
-time ../target/release/rn simple "g-(g:int)-a-(a:int)-al-(al:int)->artist-(a)-album-(al)-genre-(g)" --multi --glob "files*/g*";
+time ../target/release/rn simple "g-(g:int)-a-(a:int)-al-(al:int)->artist-(a)-album-(al)-genre-(g)" --glob "files*/g*";
 rm -r files;
 rm -r files*;
