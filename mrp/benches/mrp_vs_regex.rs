@@ -1,5 +1,7 @@
+use std::str::FromStr;
+
 use criterion::{criterion_group, criterion_main, Criterion};
-use mrp::{parser::Parser, MatchAndReplaceStrategy, MatchAndReplacer};
+use mrp::{parser::MatchAndReplaceExpression, MatchAndReplaceStrategy, MatchAndReplacer};
 use regex::Regex;
 
 const EXP: &str = "(num:int)asdf->lul(num)";
@@ -11,8 +13,8 @@ fn regex_benchmark(c: &mut Criterion) {
 }
 
 fn mrp_benchmark(c: &mut Criterion) {
-    let exp = Parser::from(EXP).parse().unwrap();
-    let r = MatchAndReplacer::new(&exp);
+    let exp = MatchAndReplaceExpression::from_str(EXP).unwrap();
+    let r = MatchAndReplacer::new(exp);
     c.bench_function("mrp strat", |b| {
         b.iter(|| {
             r.apply(INPUT);

@@ -16,13 +16,13 @@ pub enum TokenKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum TokenText<'t> {
-    Slice(&'t str),
+pub enum TokenText<'source> {
+    Slice(&'source str),
     Empty,
 }
 
-impl<'t> Deref for TokenText<'t> {
-    type Target = &'t str;
+impl<'source> Deref for TokenText<'source> {
+    type Target = &'source str;
 
     fn deref(&self) -> &Self::Target {
         match self {
@@ -32,7 +32,7 @@ impl<'t> Deref for TokenText<'t> {
     }
 }
 
-impl<'a> TokenText<'a> {
+impl<'source> TokenText<'source> {
     pub fn len(&self) -> usize {
         match self {
             TokenText::Slice(s) => s.len(),
@@ -41,7 +41,7 @@ impl<'a> TokenText<'a> {
     }
 }
 
-impl<'t> Display for TokenText<'t> {
+impl<'source> Display for TokenText<'source> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -55,31 +55,31 @@ impl<'t> Display for TokenText<'t> {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Token<'t> {
+pub struct Token<'source> {
     pub kind: TokenKind,
-    pub text: TokenText<'t>,
+    pub text: TokenText<'source>,
     pub start: usize,
 }
 
 #[derive(Debug)]
-pub struct Lexer<'a> {
-    input: &'a [u8],
+pub struct Lexer<'source> {
+    input: &'source [u8],
     position: usize,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
+impl<'source> Lexer<'source> {
+    pub fn new(input: &'source str) -> Self {
         Self {
             input: input.as_bytes(),
             position: 0,
         }
     }
 
-    pub fn input(&self) -> &'a str {
+    pub fn input(&self) -> &'source str {
         std::str::from_utf8(&self.input).expect("input should only contain utf-8 characters")
     }
 
-    fn input_slice(&self, range: Range<usize>) -> &'a str {
+    fn input_slice(&self, range: Range<usize>) -> &'source str {
         std::str::from_utf8(&self.input[range]).expect("input should only contain utf-8 characters")
     }
 
@@ -134,7 +134,7 @@ impl<'a> Lexer<'a> {
         return (start_pos, self.position + 1);
     }
 
-    pub fn next_token(&mut self) -> Token<'a> {
+    pub fn next_token(&mut self) -> Token<'source> {
         let t = match self.ch() {
             Some(ch) => match ch {
                 b'(' => self.char_token(TokenKind::Lparen),
@@ -165,7 +165,7 @@ impl<'a> Lexer<'a> {
         t
     }
 
-    fn type_token(&mut self) -> Token<'a> {
+    fn type_token(&mut self) -> Token<'source> {
         let start = self.position;
         let (s, e) = self.read_while(|c| c.is_ascii_alphabetic());
         let slice = self.input_slice(s..e);
@@ -176,7 +176,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn identifier_token(&mut self) -> Token<'a> {
+    fn identifier_token(&mut self) -> Token<'source> {
         let start = self.position;
         let (s, e) = self.read_while(|c| c.is_ascii_alphabetic());
         let slice = self.input_slice(s..e);
@@ -188,7 +188,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn literal(&mut self) -> Token<'a> {
+    fn literal(&mut self) -> Token<'source> {
         let start = self.position;
         let (s, e) = self.read_while(|c| match c {
             b'(' | b')' | b':' | b'-' => false,
@@ -201,7 +201,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn char_token(&self, kind: TokenKind) -> Token<'a> {
+    fn char_token(&self, kind: TokenKind) -> Token<'source> {
         Token {
             kind,
             text: TokenText::Slice(self.input_slice(self.position..self.position + 1)),

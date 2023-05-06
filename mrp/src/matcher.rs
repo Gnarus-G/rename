@@ -1,30 +1,36 @@
-use crate::parser::{AbstractMatchingExpression, CaptureType, MatchExpression};
+use crate::{
+    captures::Captures,
+    parser::{AbstractMatchingExpression, CaptureType, MatchExpression},
+};
 
-pub struct Match<'t> {
-    text: &'t str,
+pub struct Match<'input> {
+    input: &'input str,
     pub start: usize,
     pub end: usize,
 }
 
-impl<'t> Match<'t> {
+impl<'input> Match<'input> {
     pub fn as_str(&self) -> &str {
-        &self.text[self.start..self.end]
+        &self.input[self.start..self.end]
     }
 }
 
-impl<'a> MatchExpression<'a> {
-    /// Find the leftmost-first match in the input starting at the given position
-    pub fn find_at<'t: 'a, 's: 'a>(&'s self, input: &'t str, start: usize) -> Option<Match<'t>> {
+impl<'source> MatchExpression<'source> {
+    pub fn find_at_capturing<'input>(
+        &self,
+        input: &'input str,
+        start: usize,
+    ) -> (Option<Match<'input>>, Captures<'source, 'input>) {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
         let mut capture_slice_start = None;
         let mut capture_candidate_found = None;
 
-        let mut captures_map = self.captures.borrow_mut();
+        let mut captures = Captures::new();
 
         while state < self.expressions.len() && curr_position < input.len() {
-            let e = self.expressions.get(state).unwrap();
+            let e = self.get_expression(state).unwrap();
 
             match e {
                 AbstractMatchingExpression::Literal(literal) => {
@@ -43,7 +49,7 @@ impl<'a> MatchExpression<'a> {
 
                     let slice = &input[slice_range];
 
-                    let is_match = slice == *literal;
+                    let is_match = slice == literal;
 
                     if is_match {
                         state += 1;
@@ -64,7 +70,7 @@ impl<'a> MatchExpression<'a> {
                         if ch.is_ascii_digit() {
                             curr_position += 1;
                             state += 1;
-                            captures_map.insert(identifier.as_ref(), ch_str);
+                            captures.put(identifier.as_ref(), ch_str);
                         } else {
                             curr_position += 1;
                             state = 0;
@@ -74,7 +80,7 @@ impl<'a> MatchExpression<'a> {
                         let ch = input.as_bytes()[curr_position] as char;
 
                         let mut capture = |start: usize, curr_position: usize| {
-                            captures_map.insert(identifier.as_ref(), &input[start..curr_position]);
+                            captures.put(identifier.as_ref(), &input[start..curr_position]);
                         };
 
                         if ch.is_ascii_digit() {
@@ -107,47 +113,55 @@ impl<'a> MatchExpression<'a> {
         }
 
         if state == self.expressions.len() {
-            return Some(Match {
-                text: input,
-                start: legit_start,
-                end: curr_position,
-            });
+            return (
+                Some(Match {
+                    input,
+                    start: legit_start,
+                    end: curr_position,
+                }),
+                captures,
+            );
         }
 
-        None
+        (None, captures)
     }
 
-    pub fn find_iter<'m: 'a, 't>(&'m self, text: &'t str) -> Matches<'t, 'm> {
-        Matches::new(self, text)
+    /// Find the leftmost-first match in the input starting at the given position
+    pub fn find_at<'input>(&self, input: &'input str, start: usize) -> Option<Match<'input>> {
+        self.find_at_capturing(input, start).0
+    }
+
+    pub fn find_iter<'input>(self, input: &'input str) -> Matches<'input, 'source> {
+        Matches::new(self, input)
     }
 }
 
 #[derive(Debug)]
-pub struct Matches<'t, 'm> {
-    pub(crate) text: &'t str,
-    pub(crate) mex: &'m MatchExpression<'m>,
+pub struct Matches<'input, 'source> {
+    pub(crate) input: &'input str,
+    pub(crate) mex: MatchExpression<'source>,
     last_end: usize,
 }
 
-impl<'t, 'm> Matches<'t, 'm> {
-    pub fn new(mex: &'m MatchExpression<'m>, text: &'t str) -> Self {
+impl<'input, 'source> Matches<'input, 'source> {
+    pub fn new(mex: MatchExpression<'source>, input: &'input str) -> Self {
         Self {
-            text,
+            input,
             mex,
             last_end: 0,
         }
     }
 }
 
-impl<'t: 'm, 'm> Iterator for Matches<'t, 'm> {
-    type Item = Match<'t>;
+impl<'input, 'source> Iterator for Matches<'input, 'source> {
+    type Item = Match<'input>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.last_end >= self.text.len() {
+        if self.last_end >= self.input.len() {
             return None;
         }
 
-        let m = match self.mex.find_at(self.text, self.last_end) {
+        let m = match self.mex.find_at(self.input, self.last_end) {
             None => return None,
             Some(m) => m,
         };
@@ -161,6 +175,8 @@ impl<'t: 'm, 'm> Iterator for Matches<'t, 'm> {
 #[cfg(test)]
 mod tests {
 
+    use std::str::FromStr;
+
     use crate::{lexer::Lexer, parser::Parser};
 
     use super::*;
@@ -170,11 +186,11 @@ mod tests {
         macro_rules! assert_match_on {
             ($pattern:literal, $input:literal) => {
                 let exp = Parser::new(Lexer::new($pattern)).parse_match_exp().unwrap();
-                assert!(Matches::new(&exp, $input).count() > 0);
+                assert!(Matches::new(exp, $input).count() > 0);
             };
             ($pattern:literal, $input:literal, $boolean:literal) => {
                 let exp = Parser::new(Lexer::new($pattern)).parse_match_exp().unwrap();
-                assert_eq!(Matches::new(&exp, $input).count() > 0, $boolean);
+                assert_eq!(Matches::new(exp, $input).count() > 0, $boolean);
             };
         }
 
@@ -194,8 +210,11 @@ mod tests {
         let text = "ab321love78";
 
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
-        assert_eq!(exp.get_capture("n").unwrap(), "321");
-        assert_eq!(exp.get_capture("i").unwrap(), "78");
+
+        let cap = exp.find_at_capturing(text, 0).1;
+
+        assert_eq!(cap.get("n").unwrap(), "321");
+        assert_eq!(cap.get("i").unwrap(), "78");
     }
 
     #[test]
@@ -206,7 +225,8 @@ mod tests {
         let text = "aewrdigit276yoypa";
 
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), "digit2");
-        assert_eq!(exp.get_capture("d").unwrap(), "2");
+        let cap = exp.find_at_capturing(text, 0).1;
+        assert_eq!(cap.get("d").unwrap(), "2");
     }
 
     #[test]
@@ -217,9 +237,10 @@ mod tests {
         let text = "ab321love78ly8";
 
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), text);
-        assert_eq!(exp.get_capture("n").unwrap(), "321");
-        assert_eq!(exp.get_capture("i").unwrap(), "78");
-        assert_eq!(exp.get_capture("d").unwrap(), "8");
+        let cap = exp.find_at_capturing(text, 0).1;
+        assert_eq!(cap.get("n").unwrap(), "321");
+        assert_eq!(cap.get("i").unwrap(), "78");
+        assert_eq!(cap.get("d").unwrap(), "8");
     }
 
     #[test]
@@ -230,24 +251,24 @@ mod tests {
         let text = "ab321love78ly8";
 
         assert_eq!(exp.find_at(text, 0).unwrap().as_str(), &text[2..]);
-        assert_eq!(exp.get_capture("n").unwrap(), "321");
-        assert_eq!(exp.get_capture("i").unwrap(), "78");
-        assert_eq!(exp.get_capture("d").unwrap(), "8");
+
+        let cap = exp.find_at_capturing(text, 0).1;
+        assert_eq!(cap.get("n").unwrap(), "321");
+        assert_eq!(cap.get("i").unwrap(), "78");
+        assert_eq!(cap.get("d").unwrap(), "8");
     }
 
     #[test]
     fn special() {
-        let mut parser = Parser::from("hello(as:dig)->oh(as)hi");
-        let exp = parser.parse_match_exp().unwrap();
+        let exp = MatchExpression::from_str("hello(as:dig)->oh(as)hi").unwrap();
         assert_eq!(exp.find_at("ashello090", 0).unwrap().as_str(), "hello0");
     }
 
     #[test]
     fn muliple_matches() {
-        let mut parser = Parser::from("xy(n:int)");
-        let pattern = parser.parse_match_exp().unwrap();
+        let pattern = MatchExpression::from_str("xy(n:int)").unwrap();
         let text = "wxy10xy33asdfxy81";
-        let mut matches = Matches::new(&pattern, text);
+        let mut matches = Matches::new(pattern, text);
 
         assert_eq!(matches.next().unwrap().as_str(), "xy10");
         assert_eq!(matches.next().unwrap().as_str(), "xy33");

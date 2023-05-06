@@ -2,25 +2,25 @@ use colored::Colorize;
 
 use crate::lexer::{Token, TokenKind};
 
-pub type Result<'s, T> = std::result::Result<T, ParseError<'s>>;
+pub type Result<'source, T> = std::result::Result<T, ParseError<'source>>;
 
 #[derive(Debug, PartialEq)]
-pub enum ParseErrorKind<'t> {
+pub enum ParseErrorKind<'source> {
     ExpectedToken {
         expected: TokenKind,
         found: TokenKind,
-        text: &'t str,
+        text: &'source str,
         position: usize,
     },
-    UnsupportedToken(Token<'t>),
+    UnsupportedToken(Token<'source>),
     UnexpectedToken {
         unexpected: TokenKind,
         previous: TokenKind,
         position: usize,
     },
     UndeclaredIdentifier {
-        ident: &'t str,
-        declared: Vec<&'t str>,
+        ident: &'source str,
+        declared: Vec<&'source str>,
         position: usize,
     },
 }
@@ -41,9 +41,9 @@ impl TokenKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ParseError<'t> {
-    pub(crate) input: &'t str,
-    pub(crate) kind: ParseErrorKind<'t>,
+pub struct ParseError<'source> {
+    pub(crate) source: &'source str,
+    pub(crate) kind: ParseErrorKind<'source>,
 }
 
 impl<'t> ParseError<'t> {
@@ -63,7 +63,7 @@ impl<'t> std::fmt::Display for ParseError<'t> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use ParseErrorKind::*;
 
-        writeln!(f, "{}", self.input.yellow())?;
+        writeln!(f, "\n{}", self.source.yellow())?;
 
         let location = self.error_location();
 
@@ -145,20 +145,22 @@ impl<'t> std::fmt::Display for ParseError<'t> {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
-    use crate::parser::Parser;
+    use crate::parser::MatchAndReplaceExpression;
     use ParseErrorKind::*;
     use TokenKind::*;
 
     macro_rules! assert_error {
         ($input:literal, $error_kind:expr) => {
             let input = $input;
-            let err = Parser::from(input).parse().unwrap_err();
+            let err = MatchAndReplaceExpression::from_str(input).unwrap_err();
 
             assert_eq!(
                 err,
                 ParseError {
-                    input: $input,
+                    source: $input,
                     kind: $error_kind
                 }
             );
