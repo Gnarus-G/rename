@@ -42,6 +42,9 @@ For example to replace `file1`, or `file99` to `1renamed.txt` or `99renamed.txt`
 
 ![simplescreenrecorder-2023-01-01_23 51 24](https://user-images.githubusercontent.com/37311893/210196100-96190c6e-9597-4755-a0a0-de86ca407d4a.gif)
 
+## Performant (2x faster that perl-rename)
+One might say, blazingly fast?
+
 ## Note
 
 The "simple" match and replace syntax is still in development. The happy path pretty much works, and the parser gives comprehensive error messages.
