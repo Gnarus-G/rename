@@ -3,24 +3,24 @@ use crate::{
     parser::{AbstractMatchingExpression, CaptureType, MatchExpression},
 };
 
-pub struct Match<'t> {
-    text: &'t str,
+pub struct Match<'input> {
+    text: &'input str,
     pub start: usize,
     pub end: usize,
 }
 
-impl<'t> Match<'t> {
+impl<'input> Match<'input> {
     pub fn as_str(&self) -> &str {
         &self.text[self.start..self.end]
     }
 }
 
-impl<'i> MatchExpression<'i> {
-    pub fn find_at_capturing<'t: 'i>(
+impl<'source> MatchExpression<'source> {
+    pub fn find_at_capturing<'input: 'source>(
         &self,
-        input: &'t str,
+        input: &'input str,
         start: usize,
-    ) -> (Option<Match<'t>>, Captures<'i>) {
+    ) -> (Option<Match<'input>>, Captures<'source>) {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
@@ -127,41 +127,45 @@ impl<'i> MatchExpression<'i> {
     }
 
     /// Find the leftmost-first match in the input starting at the given position
-    pub fn find_at<'t: 'i>(&self, input: &'t str, start: usize) -> Option<Match<'t>> {
+    pub fn find_at<'input: 'source>(
+        &self,
+        input: &'input str,
+        start: usize,
+    ) -> Option<Match<'input>> {
         self.find_at_capturing(input, start).0
     }
 
-    pub fn find_iter<'t>(self, text: &'t str) -> Matches<'t, 'i> {
-        Matches::new(self, text)
+    pub fn find_iter<'input>(self, input: &'input str) -> Matches<'input, 'source> {
+        Matches::new(self, input)
     }
 }
 
 #[derive(Debug)]
-pub struct Matches<'t, 'i> {
-    pub(crate) text: &'t str,
-    pub(crate) mex: MatchExpression<'i>,
+pub struct Matches<'input, 'source> {
+    pub(crate) input: &'input str,
+    pub(crate) mex: MatchExpression<'source>,
     last_end: usize,
 }
 
-impl<'t, 'm> Matches<'t, 'm> {
-    pub fn new(mex: MatchExpression<'m>, text: &'t str) -> Self {
+impl<'input, 'source> Matches<'input, 'source> {
+    pub fn new(mex: MatchExpression<'source>, input: &'input str) -> Self {
         Self {
-            text,
+            input,
             mex,
             last_end: 0,
         }
     }
 }
 
-impl<'t: 'm, 'm> Iterator for Matches<'t, 'm> {
-    type Item = Match<'t>;
+impl<'input: 'source, 'source> Iterator for Matches<'input, 'source> {
+    type Item = Match<'input>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.last_end >= self.text.len() {
+        if self.last_end >= self.input.len() {
             return None;
         }
 
-        let m = match self.mex.find_at(self.text, self.last_end) {
+        let m = match self.mex.find_at(self.input, self.last_end) {
             None => return None,
             Some(m) => m,
         };

@@ -12,23 +12,23 @@ pub enum CaptureType {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum AbstractMatchingExpression<'a> {
-    Literal(&'a str),
+pub enum AbstractMatchingExpression<'source> {
+    Literal(&'source str),
     Capture {
-        identifier: &'a str,
+        identifier: &'source str,
         identifier_type: CaptureType,
     },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum AbstractReplaceExpression<'a> {
-    Literal(&'a str),
-    Identifier(&'a str),
+pub enum AbstractReplaceExpression<'source> {
+    Literal(&'source str),
+    Identifier(&'source str),
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MatchExpression<'a> {
-    pub expressions: Vec<AbstractMatchingExpression<'a>>,
+pub struct MatchExpression<'source> {
+    pub expressions: Vec<AbstractMatchingExpression<'source>>,
 }
 
 impl FromStr for MatchExpression<'static> {
@@ -40,25 +40,25 @@ impl FromStr for MatchExpression<'static> {
     }
 }
 
-impl<'a> MatchExpression<'a> {
-    pub fn new(expressions: Vec<AbstractMatchingExpression<'a>>) -> Self {
+impl<'source> MatchExpression<'source> {
+    pub fn new(expressions: Vec<AbstractMatchingExpression<'source>>) -> Self {
         Self { expressions }
     }
 
-    pub fn get_expression(&self, idx: usize) -> Option<AbstractMatchingExpression<'a>> {
+    pub fn get_expression(&self, idx: usize) -> Option<AbstractMatchingExpression<'source>> {
         self.expressions.get(idx).map(|exp| exp.clone())
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ReplaceExpression<'a> {
-    pub expressions: Vec<AbstractReplaceExpression<'a>>,
+pub struct ReplaceExpression<'source> {
+    pub expressions: Vec<AbstractReplaceExpression<'source>>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct MatchAndReplaceExpression<'a> {
-    pub mex: MatchExpression<'a>,
-    pub rex: ReplaceExpression<'a>,
+pub struct MatchAndReplaceExpression<'source> {
+    pub mex: MatchExpression<'source>,
+    pub rex: ReplaceExpression<'source>,
 }
 
 impl FromStr for MatchAndReplaceExpression<'static> {
@@ -70,27 +70,27 @@ impl FromStr for MatchAndReplaceExpression<'static> {
     }
 }
 
-pub struct Parser<'a> {
-    lexer: Lexer<'a>,
-    peeked: Option<Token<'a>>,
+pub struct Parser<'source> {
+    lexer: Lexer<'source>,
+    peeked: Option<Token<'source>>,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(lexer: Lexer<'a>) -> Self {
+impl<'source> Parser<'source> {
+    pub fn new(lexer: Lexer<'source>) -> Self {
         Self {
             lexer,
             peeked: None,
         }
     }
 
-    fn token(&mut self) -> Token<'a> {
+    fn token(&mut self) -> Token<'source> {
         match self.peeked.take() {
             Some(t) => t,
             None => self.lexer.next_token(),
         }
     }
 
-    fn peek_token(&mut self) -> &Token<'a> {
+    fn peek_token(&mut self) -> &Token<'source> {
         self.peeked.get_or_insert_with(|| self.lexer.next_token())
     }
 
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
         self.token();
     }
 
-    pub(crate) fn parse_match_exp(&mut self) -> Result<'a, MatchExpression<'a>> {
+    pub(crate) fn parse_match_exp(&mut self) -> Result<'source, MatchExpression<'source>> {
         let mut expressions = vec![];
 
         let mut token = self.token();
@@ -135,7 +135,10 @@ impl<'a> Parser<'a> {
         Ok(MatchExpression::new(expressions))
     }
 
-    fn parse_capture(&mut self, identifier: &'a str) -> Result<'a, AbstractMatchingExpression<'a>> {
+    fn parse_capture(
+        &mut self,
+        identifier: &'source str,
+    ) -> Result<'source, AbstractMatchingExpression<'source>> {
         self.eat_token();
 
         self.expect(TokenKind::Type)?;
@@ -148,7 +151,7 @@ impl<'a> Parser<'a> {
                     "dig" => CaptureType::Digit,
                     _ => {
                         return Err(ParseError {
-                            input: self.lexer.input(),
+                            source: self.lexer.input(),
                             kind: ParseErrorKind::UnsupportedToken(t),
                         })
                     }
@@ -158,7 +161,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn expect(&mut self, token_kind: TokenKind) -> Result<'a, ()> {
+    fn expect(&mut self, token_kind: TokenKind) -> Result<'source, ()> {
         let error_kind = match self.peek_token() {
             t if t.kind == token_kind => return Ok(()),
             t => ParseErrorKind::ExpectedToken {
@@ -170,12 +173,12 @@ impl<'a> Parser<'a> {
         };
 
         Err(ParseError {
-            input: self.lexer.input(),
+            source: self.lexer.input(),
             kind: error_kind,
         })
     }
 
-    fn expect_not(&mut self, token_kind: TokenKind, current: TokenKind) -> Result<'a, ()> {
+    fn expect_not(&mut self, token_kind: TokenKind, current: TokenKind) -> Result<'source, ()> {
         let error_kind = match self.peek_token() {
             t if t.kind == token_kind => ParseErrorKind::UnexpectedToken {
                 unexpected: token_kind,
@@ -186,15 +189,15 @@ impl<'a> Parser<'a> {
         };
 
         Err(ParseError {
-            input: self.lexer.input(),
+            source: self.lexer.input(),
             kind: error_kind,
         })
     }
 
     pub(crate) fn parse_replacement_exp(
         &mut self,
-        declared_idents: Vec<&'a str>,
-    ) -> Result<'a, ReplaceExpression<'a>> {
+        declared_idents: Vec<&'source str>,
+    ) -> Result<'source, ReplaceExpression<'source>> {
         let mut expressions = vec![];
 
         let mut token = self.token();
@@ -210,7 +213,7 @@ impl<'a> Parser<'a> {
                 Ident => {
                     if !declared_idents.contains(&token.text) {
                         return Err(ParseError {
-                            input: self.lexer.input(),
+                            source: self.lexer.input(),
                             kind: ParseErrorKind::UndeclaredIdentifier {
                                 ident: &token.text,
                                 declared: declared_idents,
@@ -235,7 +238,7 @@ impl<'a> Parser<'a> {
         Ok(ReplaceExpression { expressions })
     }
 
-    pub fn parse(&mut self) -> Result<'a, MatchAndReplaceExpression<'a>> {
+    pub fn parse(&mut self) -> Result<'source, MatchAndReplaceExpression<'source>> {
         let mex = self.parse_match_exp()?;
         let declared_idents = mex
             .expressions
@@ -340,12 +343,12 @@ mod tests {
 
     #[test]
     fn test_wrong_capture_syntax() {
-        let input = "(ident:)";
-        let mut p = Parser::new(Lexer::new(input));
+        let source = "(ident:)";
+        let mut p = Parser::new(Lexer::new(source));
         assert_eq!(
             p.parse_match_exp().unwrap_err(),
             ParseError {
-                input,
+                source,
                 kind: ParseErrorKind::ExpectedToken {
                     expected: TokenKind::Type,
                     found: TokenKind::Rparen,

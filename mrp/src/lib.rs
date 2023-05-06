@@ -4,26 +4,26 @@ pub mod lexer;
 mod matcher;
 pub mod parser;
 
-use std::{borrow::Cow, ops::Deref, sync::Arc};
+use std::borrow::Cow;
 
 use parser::{AbstractReplaceExpression, MatchAndReplaceExpression, MatchExpression};
 
 /// Representing a stragety by which to match and replace on a `string` value
-pub trait MatchAndReplaceStrategy<'s> {
+pub trait MatchAndReplaceStrategy<'input> {
     /// Match and replace
-    fn apply(&self, value: &'s str) -> Option<std::borrow::Cow<'s, str>>;
+    fn apply(&self, value: &'input str) -> Option<std::borrow::Cow<'input, str>>;
 }
 
-pub struct MatchAndReplacer<'m> {
-    mex: MatchExpression<'m>,
-    exprs: Vec<AbstractReplaceExpression<'m>>,
+pub struct MatchAndReplacer<'source> {
+    mex: MatchExpression<'source>,
+    exprs: Vec<AbstractReplaceExpression<'source>>,
     /// When true, this strategy will replace the matching range found, and strip everything else
     /// off.
     strip: bool,
 }
 
-impl<'m> MatchAndReplacer<'m> {
-    pub fn new(mrex: MatchAndReplaceExpression<'m>) -> Self {
+impl<'source> MatchAndReplacer<'source> {
+    pub fn new(mrex: MatchAndReplaceExpression<'source>) -> Self {
         Self {
             mex: mrex.mex,
             exprs: mrex.rex.expressions,
@@ -36,14 +36,8 @@ impl<'m> MatchAndReplacer<'m> {
     }
 }
 
-impl<'i> MatchAndReplaceStrategy<'i> for Arc<MatchAndReplacer<'i>> {
-    fn apply(&self, value: &'i str) -> Option<std::borrow::Cow<'i, str>> {
-        self.deref().apply(value)
-    }
-}
-
-impl<'i> MatchAndReplaceStrategy<'i> for MatchAndReplacer<'i> {
-    fn apply(&self, value: &'i str) -> Option<std::borrow::Cow<'i, str>> {
+impl<'input> MatchAndReplaceStrategy<'input> for MatchAndReplacer<'input> {
+    fn apply(&self, value: &'input str) -> Option<std::borrow::Cow<'input, str>> {
         match self.mex.find_at_capturing(value, 0) {
             (None, _) => None,
             (Some(m), captures) => {
@@ -77,8 +71,8 @@ mod tests {
 
     use super::*;
 
-    impl<'m> MatchAndReplacer<'m> {
-        fn apply_all(&mut self, values: Vec<&'m str>) -> Vec<String> {
+    impl<'source> MatchAndReplacer<'source> {
+        fn apply_all(&mut self, values: Vec<&'source str>) -> Vec<String> {
             let mut replaced = vec![];
             for value in values {
                 if let Some(v) = self.apply(value) {
