@@ -1,19 +1,19 @@
 #[derive(Debug, PartialEq)]
-struct Capture<'i> {
-    name: &'i str,
-    value: &'i str,
+struct Capture<'source, 'input> {
+    name: &'source str,
+    value: &'input str,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Captures<'i> {
-    inner: Vec<Capture<'i>>,
+pub struct Captures<'source, 'input> {
+    inner: Vec<Capture<'source, 'input>>,
 }
 
-impl<'i> Captures<'i> {
+impl<'source, 'input> Captures<'source, 'input> {
     pub fn new() -> Self {
         Self { inner: vec![] }
     }
-    pub fn put(&mut self, name: &'i str, value: &'i str) {
+    pub fn put(&mut self, name: &'source str, value: &'input str) {
         self.inner.push(Capture { name, value });
     }
     pub fn get(&self, name: &str) -> Option<&str> {

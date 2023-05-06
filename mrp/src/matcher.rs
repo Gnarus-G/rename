@@ -4,23 +4,23 @@ use crate::{
 };
 
 pub struct Match<'input> {
-    text: &'input str,
+    input: &'input str,
     pub start: usize,
     pub end: usize,
 }
 
 impl<'input> Match<'input> {
     pub fn as_str(&self) -> &str {
-        &self.text[self.start..self.end]
+        &self.input[self.start..self.end]
     }
 }
 
 impl<'source> MatchExpression<'source> {
-    pub fn find_at_capturing<'input: 'source>(
+    pub fn find_at_capturing<'input>(
         &self,
         input: &'input str,
         start: usize,
-    ) -> (Option<Match<'input>>, Captures<'source>) {
+    ) -> (Option<Match<'input>>, Captures<'source, 'input>) {
         let mut curr_position = start;
         let mut legit_start = start;
         let mut state = 0;
@@ -115,7 +115,7 @@ impl<'source> MatchExpression<'source> {
         if state == self.expressions.len() {
             return (
                 Some(Match {
-                    text: input,
+                    input,
                     start: legit_start,
                     end: curr_position,
                 }),
@@ -127,11 +127,7 @@ impl<'source> MatchExpression<'source> {
     }
 
     /// Find the leftmost-first match in the input starting at the given position
-    pub fn find_at<'input: 'source>(
-        &self,
-        input: &'input str,
-        start: usize,
-    ) -> Option<Match<'input>> {
+    pub fn find_at<'input>(&self, input: &'input str, start: usize) -> Option<Match<'input>> {
         self.find_at_capturing(input, start).0
     }
 
@@ -157,7 +153,7 @@ impl<'input, 'source> Matches<'input, 'source> {
     }
 }
 
-impl<'input: 'source, 'source> Iterator for Matches<'input, 'source> {
+impl<'input, 'source> Iterator for Matches<'input, 'source> {
     type Item = Match<'input>;
 
     fn next(&mut self) -> Option<Self::Item> {
