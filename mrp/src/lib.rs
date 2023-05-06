@@ -6,7 +6,7 @@ pub mod parser;
 
 use std::{borrow::Cow, ops::Deref, sync::Arc};
 
-use parser::{AbstractReplaceExpression, MatchAndReplaceExpression};
+use parser::{AbstractReplaceExpression, MatchAndReplaceExpression, MatchExpression};
 
 /// Representing a stragety by which to match and replace on a `string` value
 pub trait MatchAndReplaceStrategy<'s> {
@@ -15,7 +15,8 @@ pub trait MatchAndReplaceStrategy<'s> {
 }
 
 pub struct MatchAndReplacer<'m> {
-    mrex: MatchAndReplaceExpression<'m>,
+    mex: MatchExpression<'m>,
+    exprs: Vec<AbstractReplaceExpression<'m>>,
     /// When true, this strategy will replace the matching range found, and strip everything else
     /// off.
     strip: bool,
@@ -23,7 +24,11 @@ pub struct MatchAndReplacer<'m> {
 
 impl<'m> MatchAndReplacer<'m> {
     pub fn new(mrex: MatchAndReplaceExpression<'m>) -> Self {
-        Self { mrex, strip: false }
+        Self {
+            mex: mrex.mex,
+            exprs: mrex.rex.expressions,
+            strip: false,
+        }
     }
 
     pub fn set_strip(&mut self, s: bool) {
@@ -39,14 +44,12 @@ impl<'i> MatchAndReplaceStrategy<'i> for Arc<MatchAndReplacer<'i>> {
 
 impl<'i> MatchAndReplaceStrategy<'i> for MatchAndReplacer<'i> {
     fn apply(&self, value: &'i str) -> Option<std::borrow::Cow<'i, str>> {
-        match self.mrex.mex.find_at_capturing(value, 0) {
+        match self.mex.find_at_capturing(value, 0) {
             (None, _) => None,
             (Some(m), captures) => {
                 let mut new = Cow::from(value);
                 let replacement_str: String = self
-                    .mrex
-                    .rex
-                    .expressions
+                    .exprs
                     .iter()
                     .map(|e| match e {
                         AbstractReplaceExpression::Literal(l) => *l,
