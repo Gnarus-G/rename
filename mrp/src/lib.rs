@@ -136,4 +136,24 @@ mod tests {
 
         assert_eq!(treated, vec!["step1", "step11", "step99"]);
     }
+
+    #[test]
+    fn handles_byte_indexing_inside_a_unicode_character() {
+        let cases = [
+            // control: doesn't cause panic, since capture group is far
+            // away from the 〰
+            ("a2—a—〰", "2b—a—〰"),
+            // rest would other wise cause panic if we weren't carefull about indexing a &str
+            ("as—a—a9", "as—a—9b"),
+            ("a7as—a—〰", "7bas—a—〰"),
+            ("a〰a4〰-34", "a〰4b〰-34"),
+        ];
+
+        for (input, output) in cases {
+            let exp = MatchAndReplaceExpression::from_str("a(a:dig)->(a)b").unwrap();
+            let strat = MatchAndReplacer::new(exp);
+
+            assert_eq!(strat.apply(input).unwrap(), output);
+        }
+    }
 }
