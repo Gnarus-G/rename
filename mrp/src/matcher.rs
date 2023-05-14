@@ -26,10 +26,11 @@ impl<'source> MatchExpression<'source> {
         let mut state = 0;
         let mut capture_slice_start = None;
         let mut capture_candidate_found = None;
+        let input_bytes = input.as_bytes();
 
         let mut captures = Captures::new();
 
-        while state < self.expressions.len() && curr_position < input.len() {
+        while state < self.expressions.len() && curr_position < input_bytes.len() {
             let e = self.get_expression(state).unwrap();
 
             match e {
@@ -42,14 +43,14 @@ impl<'source> MatchExpression<'source> {
                         legit_start = curr_position;
                     };
 
-                    if slice_range.end > input.len() {
+                    if slice_range.end > input_bytes.len() {
                         update_pointers();
                         continue;
                     }
 
-                    let slice = &input[slice_range];
+                    let slice = &input_bytes[slice_range];
 
-                    let is_match = slice == literal;
+                    let is_match = slice == literal.as_bytes();
 
                     if is_match {
                         state += 1;
@@ -64,23 +65,26 @@ impl<'source> MatchExpression<'source> {
                     identifier_type,
                 } => match identifier_type {
                     CaptureType::Digit => {
-                        let ch = input.as_bytes()[curr_position];
-                        let ch_str = &input[curr_position..curr_position + 1];
+                        let ch = input_bytes[curr_position];
+                        let ch_str = &input_bytes[curr_position..curr_position + 1];
 
                         if ch.is_ascii_digit() {
                             curr_position += 1;
                             state += 1;
-                            captures.put(identifier.as_ref(), ch_str);
+                            let captured_digit = &std::str::from_utf8(ch_str).unwrap();
+                            captures.put(identifier, captured_digit);
                         } else {
                             curr_position += 1;
                             state = 0;
                         }
                     }
                     CaptureType::Int => {
-                        let ch = input.as_bytes()[curr_position] as char;
+                        let ch = input_bytes[curr_position] as char;
 
                         let mut capture = |start: usize, curr_position: usize| {
-                            captures.put(identifier.as_ref(), &input[start..curr_position]);
+                            let captured_int =
+                                &std::str::from_utf8(&input_bytes[start..curr_position]).unwrap();
+                            captures.put(identifier, &captured_int);
                         };
 
                         if ch.is_ascii_digit() {
@@ -94,7 +98,7 @@ impl<'source> MatchExpression<'source> {
                             capture_candidate_found = Some(true);
                             curr_position += 1;
 
-                            if curr_position == input.len() {
+                            if curr_position == input_bytes.len() {
                                 state += 1;
                                 capture(capture_slice_start.unwrap(), curr_position);
                                 capture_slice_start = None;
