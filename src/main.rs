@@ -34,9 +34,9 @@ struct RenameArgs {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Use a simple match-and-replace-protocol syntax. (e.g. "hello(n:int)->hi(n)")
-    SIMPLE(SimpleArgs),
+    Simple(SimpleArgs),
     /// Use and apply a regex replace on each filename
-    REGEX(RegexArgs),
+    Regex(RegexArgs),
 }
 
 fn main() -> ExitCode {
@@ -64,8 +64,8 @@ fn main() -> ExitCode {
     };
 
     match base_args.command {
-        Command::REGEX(args) => rename::in_bulk(&paths, &args, options),
-        Command::SIMPLE(args) => {
+        Command::Regex(args) => rename::in_bulk(&paths, &args, options),
+        Command::Simple(args) => {
             let mut replacer = MatchAndReplacer::new(args.expression);
             replacer.set_strip(args.strip);
             rename::in_bulk(&paths, &replacer, options);

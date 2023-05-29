@@ -54,7 +54,7 @@ impl<'source> MatchExpression<'source> {
 
                     if is_match {
                         state += 1;
-                        curr_position = literal.len() + curr_position;
+                        curr_position += literal.len();
                     } else {
                         update_pointers();
                         continue;
@@ -84,11 +84,11 @@ impl<'source> MatchExpression<'source> {
                         let mut capture = |start: usize, curr_position: usize| {
                             let captured_int =
                                 &std::str::from_utf8(&input_bytes[start..curr_position]).unwrap();
-                            captures.put(identifier, &captured_int);
+                            captures.put(identifier, captured_int);
                         };
 
                         if ch.is_ascii_digit() {
-                            if let None = capture_slice_start {
+                            if capture_slice_start.is_none() {
                                 capture_slice_start = Some(curr_position);
                                 if state == 0 {
                                     legit_start = curr_position;

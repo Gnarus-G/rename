@@ -26,7 +26,7 @@ impl<'source> Deref for TokenText<'source> {
 
     fn deref(&self) -> &Self::Target {
         match self {
-            TokenText::Slice(s) => &s,
+            TokenText::Slice(s) => s,
             TokenText::Empty => &"",
         }
     }
@@ -37,6 +37,12 @@ impl<'source> TokenText<'source> {
         match self {
             TokenText::Slice(s) => s.len(),
             TokenText::Empty => 0,
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        match self {
+            TokenText::Slice(s) => s.is_empty(),
+            TokenText::Empty => true,
         }
     }
 }
@@ -76,7 +82,7 @@ impl<'source> Lexer<'source> {
     }
 
     pub fn input(&self) -> &'source str {
-        std::str::from_utf8(&self.input).expect("input should only contain utf-8 characters")
+        std::str::from_utf8(self.input).expect("input should only contain utf-8 characters")
     }
 
     fn input_slice(&self, range: Range<usize>) -> &'source str {
@@ -190,10 +196,7 @@ impl<'source> Lexer<'source> {
 
     fn literal(&mut self) -> Token<'source> {
         let start = self.position;
-        let (s, e) = self.read_while(|c| match c {
-            b'(' | b')' | b':' | b'-' => false,
-            _ => true,
-        });
+        let (s, e) = self.read_while(|c| !matches!(c, b'(' | b')' | b':' | b'-'));
         Token {
             kind: TokenKind::Literal,
             text: TokenText::Slice(self.input_slice(s..e)),

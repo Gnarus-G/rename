@@ -46,7 +46,7 @@ impl<'source> MatchExpression<'source> {
     }
 
     pub fn get_expression(&self, idx: usize) -> Option<AbstractMatchingExpression<'source>> {
-        self.expressions.get(idx).map(|exp| exp.clone())
+        self.expressions.get(idx).cloned()
     }
 }
 

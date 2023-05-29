@@ -49,7 +49,7 @@ impl<'input> MatchAndReplaceStrategy<'input> for MatchAndReplacer<'input> {
                         AbstractReplaceExpression::Literal(l) => *l,
                         AbstractReplaceExpression::Identifier(i) => captures
                             .get(i)
-                            .expect(&format!("'{i}' should have been captured")),
+                            .unwrap_or_else(|| panic!("'{i}' should have been captured")),
                     })
                     .collect();
 

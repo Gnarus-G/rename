@@ -30,10 +30,8 @@ pub fn in_bulk<'p: 'r, 'r, R: MatchAndReplaceStrategy<'r> + std::marker::Sync>(
         .for_each(|(from, to)| {
             if options.no_rename {
                 println!("{:?} -> {:?}", from, to);
-            } else {
-                if let Err(err) = std::fs::rename(from, to.to_string()) {
-                    error!("{:?}: {}", from, err);
-                }
+            } else if let Err(err) = std::fs::rename(from, to.to_string()) {
+                error!("{:?}: {}", from, err);
             };
         })
 }

@@ -50,9 +50,9 @@ impl<'t> ParseError<'t> {
     fn error_location(&self) -> &usize {
         match &self.kind {
             ParseErrorKind::UnsupportedToken(t) => &t.start,
-            ParseErrorKind::ExpectedToken { position, .. } => &position,
-            ParseErrorKind::UnexpectedToken { position, .. } => &position,
-            ParseErrorKind::UndeclaredIdentifier { position, .. } => &position,
+            ParseErrorKind::ExpectedToken { position, .. } => position,
+            ParseErrorKind::UnexpectedToken { position, .. } => position,
+            ParseErrorKind::UndeclaredIdentifier { position, .. } => position,
         }
     }
 }
