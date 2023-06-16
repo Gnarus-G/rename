@@ -6,6 +6,8 @@ pub mod parser;
 
 use std::borrow::Cow;
 
+pub type Array<T> = Box<[T]>;
+
 use parser::{AbstractReplaceExpression, MatchAndReplaceExpression, MatchExpression};
 
 /// Representing a stragety by which to match and replace on a `string` value
@@ -16,7 +18,7 @@ pub trait MatchAndReplaceStrategy<'input> {
 
 pub struct MatchAndReplacer<'source> {
     mex: MatchExpression<'source>,
-    exprs: Vec<AbstractReplaceExpression<'source>>,
+    exprs: Array<AbstractReplaceExpression<'source>>,
     /// When true, this strategy will replace the matching range found, and strip everything else
     /// off.
     strip: bool,

@@ -3,6 +3,7 @@ use std::str::FromStr;
 use crate::{
     error::{ParseError, ParseErrorKind, Result},
     lexer::{Lexer, Token, TokenKind},
+    Array,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -52,7 +53,7 @@ impl<'source> MatchExpression<'source> {
 
 #[derive(Debug, PartialEq)]
 pub struct ReplaceExpression<'source> {
-    pub expressions: Vec<AbstractReplaceExpression<'source>>,
+    pub expressions: Array<AbstractReplaceExpression<'source>>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -235,7 +236,9 @@ impl<'source> Parser<'source> {
             token = self.token();
         }
 
-        Ok(ReplaceExpression { expressions })
+        Ok(ReplaceExpression {
+            expressions: expressions.into(),
+        })
     }
 
     pub fn parse(&mut self) -> Result<'source, MatchAndReplaceExpression<'source>> {
@@ -259,6 +262,8 @@ impl<'source> Parser<'source> {
 
 #[cfg(test)]
 mod tests {
+
+    use std::sync::Arc;
 
     use super::*;
 
@@ -378,10 +383,10 @@ mod tests {
         assert_eq!(
             p.parse_replacement_exp(vec!["num"]).unwrap(),
             ReplaceExpression {
-                expressions: vec![
+                expressions: Box::new([
                     AbstractReplaceExpression::Literal("lul"),
                     AbstractReplaceExpression::Identifier("num")
-                ]
+                ])
             }
         )
     }
